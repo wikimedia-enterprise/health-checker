@@ -150,7 +150,7 @@ import (
 	"time"
 	"context"
 
-	health "github.com/wikimedia-enterprise/health-checks"
+	health "github.com/wikimedia-enterprise/health-checker/health"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -190,9 +190,9 @@ func main() {
 
 ### Report Card
 
-![Build](https://github.com/wikimedia-enterprise/health-checks/actions/workflows/go.yml/badge.svg)
-![Go Report Card](https://goreportcard.com/badge/github.com/wikimedia-enterprise/health-checks)
-![GoDoc](https://pkg.go.dev/badge/github.com/wikimedia-enterprise/health-checks)
+![Build](https://github.com/wikimedia-enterprise/health-checker/actions/workflows/go.yml/badge.svg)
+![Go Report Card](https://goreportcard.com/badge/github.com/wikimedia-enterprise/health-checker)
+![GoDoc](https://pkg.go.dev/badge/github.com/wikimedia-enterprise/health-checker)
 
 
 ## License
