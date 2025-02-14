@@ -150,7 +150,7 @@ import (
 	"time"
 	"context"
 
-	health "github.com/wikimedia-enterprise/health-checks"
+	health "github.com/wikimedia-enterprise/health-checker/health"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
