@@ -14,7 +14,7 @@ A Go package for performing health checks on HTTP endpoints, AWS S3, and Apache 
 To install the package, run:
 
 ```sh
- go get github.com/wikimedia-enterprise/health-checks
+ go get github.com/wikimedia-enterprise/health-checker
 ```
 
 ## Usage
