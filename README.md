@@ -190,9 +190,9 @@ func main() {
 
 ### Report Card
 
-![Build](https://github.com/wikimedia-enterprise/health-checks/actions/workflows/go.yml/badge.svg)
-![Go Report Card](https://goreportcard.com/badge/github.com/wikimedia-enterprise/health-checks)
-![GoDoc](https://pkg.go.dev/badge/github.com/wikimedia-enterprise/health-checks)
+![Build](https://github.com/wikimedia-enterprise/health-checker/actions/workflows/go.yml/badge.svg)
+![Go Report Card](https://goreportcard.com/badge/github.com/wikimedia-enterprise/health-checker)
+![GoDoc](https://pkg.go.dev/badge/github.com/wikimedia-enterprise/health-er)
 
 
 ## License
