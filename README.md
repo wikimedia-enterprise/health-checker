@@ -192,7 +192,7 @@ func main() {
 
 ![Build](https://github.com/wikimedia-enterprise/health-checker/actions/workflows/go.yml/badge.svg)
 ![Go Report Card](https://goreportcard.com/badge/github.com/wikimedia-enterprise/health-checker)
-![GoDoc](https://pkg.go.dev/badge/github.com/wikimedia-enterprise/health-er)
+![GoDoc](https://pkg.go.dev/badge/github.com/wikimedia-enterprise/health-checker)
 
 
 ## License
