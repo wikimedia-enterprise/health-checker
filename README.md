@@ -1,10 +1,11 @@
-# health-checks
+# health-checker
 
-A Go package for performing health checks on HTTP endpoints, AWS S3, and Apache Kafka. Designed to integrate seamlessly with applications needing periodic or on-demand service health monitoring.
+A Go package for performing health checks on HTTP endpoints, AWS S3, AWS Cognito and Apache Kafka. Designed to integrate seamlessly with applications needing periodic or on-demand service health monitoring.
 
 ## Features
 - **HTTP Health Checks**: Validate the availability of web services.
 - **S3 Health Checks**: Ensure AWS S3 bucket accessibility.
+- **Cognito Health Checks**: Ensure AWS Cognito accessibility.
 - **Kafka Health Checks**: Monitor Kafka producer/consumer activity and offsets.
 - **Asynchronous Health Checks**: Run periodic checks without blocking the main application.
 - **Integration with `github.com/hellofresh/health-go`** for easy observability.
@@ -29,7 +30,7 @@ import (
 	"net/http"
 	"time"
 
-	health "github.com/wikimedia-enterprise/health-checks"
+	health "github.com/wikimedia-enterprise/health-checker/health"
 )
 
 func main() {
@@ -61,7 +62,7 @@ import (
 	"log"
 	"time"
 
-	health "github.com/wikimedia-enterprise/health-checks"
+	health "github.com/wikimedia-enterprise/health-checker/health"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -109,7 +110,7 @@ import (
 	"time"
 	"context"
 
-	health "github.com/wikimedia-enterprise/health-checks"
+	health "github.com/wikimedia-enterprise/health-checker/health"
 )
 
 func main() {
