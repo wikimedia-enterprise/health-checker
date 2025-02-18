@@ -12,26 +12,24 @@ import (
 
 // CognitoChecker implements the HealthChecker interface for AWS Cognito.
 type CognitoChecker struct {
-	Timeout         time.Duration
-	CheckerName     string
-	UserPoolId      string
-	CognitoClientID string
-	CognitoAPI      cognitoidentityprovideriface.CognitoIdentityProviderAPI
+	Timeout     time.Duration
+	CheckerName string
+	UserPoolId  string
+	CognitoAPI  cognitoidentityprovideriface.CognitoIdentityProviderAPI
 }
 
-// Check queries Cognito for the provided user pool and its client.
-// Verifies the connection to Cognito, and that the user pool ID and the user pool client are correct.
+// Check queries Cognito for the provided user pool.
+// Verifies the connection to Cognito, and that the user pool ID is correct.
 func (c *CognitoChecker) Check(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 
-	_, err := c.CognitoAPI.DescribeUserPoolClientWithContext(ctx, &cognitoidentityprovider.DescribeUserPoolClientInput{
+	_, err := c.CognitoAPI.DescribeUserPoolWithContext(ctx, &cognitoidentityprovider.DescribeUserPoolInput{
 		UserPoolId: aws.String(c.UserPoolId),
-		ClientId:   aws.String(c.CognitoClientID),
 	})
 
 	if err != nil {
-		err = fmt.Errorf("cognito DescribeUserPoolClientWithContext failed: %w", err)
+		err = fmt.Errorf("cognito DescribeUserPoolWithContext failed: %w", err)
 	}
 	return err
 }
