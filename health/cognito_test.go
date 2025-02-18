@@ -20,25 +20,23 @@ type MockCognitoClient struct {
 	mock.Mock
 }
 
-func (m *MockCognitoClient) DescribeUserPoolClientWithContext(ctx aws.Context, input *cognitoidentityprovider.DescribeUserPoolClientInput, opts ...request.Option) (*cognitoidentityprovider.DescribeUserPoolClientOutput, error) {
+func (m *MockCognitoClient) DescribeUserPoolWithContext(ctx aws.Context, input *cognitoidentityprovider.DescribeUserPoolInput, opts ...request.Option) (*cognitoidentityprovider.DescribeUserPoolOutput, error) {
 	args := m.Called(ctx, input, opts)
-	return args.Get(0).(*cognitoidentityprovider.DescribeUserPoolClientOutput), args.Error(1)
+	return args.Get(0).(*cognitoidentityprovider.DescribeUserPoolOutput), args.Error(1)
 }
 
 func TestCognitoChecker_Check_Success(t *testing.T) {
 	mockCognito := new(MockCognitoClient)
 
-	mockCognito.On("DescribeUserPoolClientWithContext", mock.Anything, &cognitoidentityprovider.DescribeUserPoolClientInput{
+	mockCognito.On("DescribeUserPoolWithContext", mock.Anything, &cognitoidentityprovider.DescribeUserPoolInput{
 		UserPoolId: aws.String("pool-id"),
-		ClientId:   aws.String("client-id"),
-	}, mock.Anything).Return(&cognitoidentityprovider.DescribeUserPoolClientOutput{}, nil)
+	}, mock.Anything).Return(&cognitoidentityprovider.DescribeUserPoolOutput{}, nil)
 
 	checker := CognitoChecker{
-		Timeout:         1 * time.Second,
-		CheckerName:     "test-cognito-check",
-		CognitoAPI:      mockCognito,
-		UserPoolId:      "pool-id",
-		CognitoClientID: "client-id",
+		Timeout:     1 * time.Second,
+		CheckerName: "test-cognito-check",
+		CognitoAPI:  mockCognito,
+		UserPoolId:  "pool-id",
 	}
 
 	err := checker.Check(context.Background())
@@ -50,13 +48,13 @@ func TestCognitoChecker_Check_Success(t *testing.T) {
 func TestCognitoChecker_Check_OtherAWSError(t *testing.T) {
 	mockCognito := new(MockCognitoClient)
 	awsErr := awserr.New("SomeAWSError", "some aws error", nil)
-	mockCognito.On("DescribeUserPoolClientWithContext", mock.Anything, mock.Anything, mock.Anything).Return((*cognitoidentityprovider.DescribeUserPoolClientOutput)(nil), awsErr)
+	mockCognito.On("DescribeUserPoolWithContext", mock.Anything, mock.Anything, mock.Anything).Return((*cognitoidentityprovider.DescribeUserPoolOutput)(nil), awsErr)
 
 	checker := CognitoChecker{CognitoAPI: mockCognito, CheckerName: "test"}
 	err := checker.Check(context.Background())
 
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "DescribeUserPoolClientWithContext failed")
+	assert.Contains(t, err.Error(), "DescribeUserPoolWithContext failed")
 	assert.ErrorIs(t, err, awsErr)
 	mockCognito.AssertExpectations(t)
 }
@@ -75,11 +73,11 @@ func TestCognitoChecker_Getters(t *testing.T) {
 
 func TestCognitoChecker_Check_ContextCancelled_DuringRequest(t *testing.T) {
 	mockCognito := new(MockCognitoClient)
-	mockCognito.On("DescribeUserPoolClientWithContext", mock.Anything, mock.Anything, mock.Anything).
+	mockCognito.On("DescribeUserPoolWithContext", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			time.Sleep(200 * time.Millisecond)
 		}).
-		Return((*cognitoidentityprovider.DescribeUserPoolClientOutput)(nil), context.DeadlineExceeded)
+		Return((*cognitoidentityprovider.DescribeUserPoolOutput)(nil), context.DeadlineExceeded)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -90,6 +88,6 @@ func TestCognitoChecker_Check_ContextCancelled_DuringRequest(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Contains(t, err.Error(), "DescribeUserPoolClientWithContext failed")
+	assert.Contains(t, err.Error(), "DescribeUserPoolWithContext failed")
 	mockCognito.AssertExpectations(t)
 }
