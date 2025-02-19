@@ -2,6 +2,9 @@ package health
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -12,26 +15,41 @@ import (
 
 // CognitoChecker implements the HealthChecker interface for AWS Cognito.
 type CognitoChecker struct {
-	Timeout     time.Duration
-	CheckerName string
-	UserPoolId  string
-	CognitoAPI  cognitoidentityprovideriface.CognitoIdentityProviderAPI
+	Timeout          time.Duration
+	CheckerName      string
+	UserPoolId       string
+	CognitoClientId  string
+	CognitoSecret    string
+	TestUserName     string
+	TestUserPassword string
+	CognitoAPI       cognitoidentityprovideriface.CognitoIdentityProviderAPI
 }
 
-// Check queries Cognito for the provided user pool.
-// Verifies the connection to Cognito, and that the user pool ID is correct.
+// Check verifies the authentication flow with Cognito for a given username and password.
 func (c *CognitoChecker) Check(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
 	defer cancel()
 
-	_, err := c.CognitoAPI.DescribeUserPoolWithContext(ctx, &cognitoidentityprovider.DescribeUserPoolInput{
-		UserPoolId: aws.String(c.UserPoolId),
+	h := hmac.New(sha256.New, []byte(c.CognitoSecret))
+
+	if _, err := h.Write([]byte(fmt.Sprintf("%s%s", c.TestUserName, c.CognitoClientId))); err != nil {
+		return fmt.Errorf("error writing to hmac hash %w", err)
+	}
+
+	_, err := c.CognitoAPI.InitiateAuthWithContext(ctx, &cognitoidentityprovider.InitiateAuthInput{
+		ClientId: aws.String(c.CognitoClientId),
+		AuthFlow: aws.String("USER_PASSWORD_AUTH"),
+		AuthParameters: map[string]*string{
+			"USERNAME":    aws.String(c.TestUserName),
+			"PASSWORD":    aws.String(c.TestUserPassword),
+			"SECRET_HASH": aws.String(base64.StdEncoding.EncodeToString(h.Sum(nil))),
+		},
 	})
 
 	if err != nil {
-		err = fmt.Errorf("cognito DescribeUserPoolWithContext failed: %w", err)
+		return fmt.Errorf("InitiateAuthWithContext failed: %w", err)
 	}
-	return err
+	return nil
 }
 
 // Name returns the name of the health check.
