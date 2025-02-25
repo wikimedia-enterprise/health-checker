@@ -39,8 +39,6 @@ func NewRedisChecker(client redis.Cmdable, config RedisCheckerConfig) (*RedisChe
 
 // Check performs the Redis health check.
 func (c *RedisChecker) Check(ctx context.Context) error {
-	fmt.Println("performing the actual Redis check")
-
 	_, err := c.client.Ping(ctx).Result()
 	if err != nil {
 		return fmt.Errorf("redis is down: %w", err)
