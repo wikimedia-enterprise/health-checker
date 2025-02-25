@@ -29,13 +29,11 @@ type KSQLDBAsyncChecker struct {
 
 // Constants for default values
 const (
-	defaultKSQLDBTimeout  = 2 * time.Second
-	defaultKSQLDBInterval = 5 * time.Second
-	defaultKSQLDBName     = "ksqldb"
+	defaultKSQLDBName = "ksqldb"
 )
 
 // NewKSQLDBAsyncChecker creates a new KSQLDBAsyncChecker.
-func NewKSQLDBAsyncChecker(KSQLURL string) (*KSQLDBAsyncChecker, error) {
+func NewKSQLDBAsyncChecker(KSQLURL string, dkt time.Duration, dki time.Duration) (*KSQLDBAsyncChecker, error) {
 
 	if KSQLURL == "" {
 		return nil, fmt.Errorf("KSQLDB endpoint is required")
@@ -44,8 +42,8 @@ func NewKSQLDBAsyncChecker(KSQLURL string) (*KSQLDBAsyncChecker, error) {
 	config := KSQLDBCheckerConfig{
 		Name:     defaultKSQLDBName,
 		Endpoint: KSQLURL,
-		Interval: defaultKSQLDBInterval,
-		Timeout:  defaultKSQLDBTimeout,
+		Interval: dki,
+		Timeout:  dkt,
 	}
 
 	client := &http.Client{
