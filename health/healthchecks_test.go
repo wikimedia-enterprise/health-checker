@@ -32,6 +32,10 @@ func (m *MockHealthChecker) Type() string {
 	return args.String(0)
 }
 
+func (m *MockHealthChecker) isAsync() bool {
+	return false
+}
+
 func (m *MockHealthChecker) GetTimeOut() time.Duration {
 	args := m.Called()
 	return args.Get(0).(time.Duration)

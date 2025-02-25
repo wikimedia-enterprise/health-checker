@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/hellofresh/health-go/v5"
@@ -16,107 +15,6 @@ type HealthChecker interface {
 	Name() string
 	Type() string // e.g., "redis", "s3", "kafka", "http"
 	GetTimeOut() time.Duration
-}
-
-// AsyncHealthStore stores the results of asynchronous health checks.
-type AsyncHealthStore struct {
-	results map[string]error
-	mu      sync.RWMutex
-}
-
-// NewAsyncHealthStore creates a new AsyncHealthStore.
-func NewAsyncHealthStore() *AsyncHealthStore {
-	return &AsyncHealthStore{
-		results: make(map[string]error),
-	}
-}
-
-// UpdateStatus updates the status of a health check.
-func (s *AsyncHealthStore) UpdateStatus(name string, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.results[name] = err
-}
-
-// GetStatus retrieves the status of a health check.
-func (s *AsyncHealthStore) GetStatus(name string) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.results[name]
-}
-
-// AsyncCheckerComponent adapts a HealthChecker for asynchronous checks using a store.
-type AsyncCheckerComponent struct {
-	store     *AsyncHealthStore
-	component health.Component
-	checkFunc func(ctx context.Context) error
-}
-
-// Name returns the name of the async health check component.
-func (ac *AsyncCheckerComponent) Name() string {
-	return ac.component.Name
-}
-
-// Check retrieves the cached health check result for async check.
-func (ac *AsyncCheckerComponent) Check(ctx context.Context) error {
-	return ac.checkFunc(ctx)
-}
-
-// Type returns the type of the async health check component.
-func (ac *AsyncCheckerComponent) Type() string {
-	return "async"
-}
-
-// AsyncChecker manages the asynchronous execution of a HealthChecker.
-type AsyncChecker struct {
-	store     *AsyncHealthStore
-	config    health.Config
-	interval  time.Duration
-	component *AsyncCheckerComponent
-}
-
-// NewAsyncChecker creates a new AsyncChecker.
-func NewAsyncChecker(checker HealthChecker, interval time.Duration) *AsyncChecker {
-	ac := &AsyncChecker{
-		store:    NewAsyncHealthStore(),
-		interval: interval,
-	}
-	ac.component = &AsyncCheckerComponent{
-		store: ac.store,
-		component: health.Component{
-			Name: checker.Name(),
-		},
-		checkFunc: func(ctx context.Context) error {
-			return ac.store.GetStatus(checker.Name())
-		},
-	}
-
-	ac.config = health.Config{
-		Name:  checker.Name(),
-		Check: checker.Check,
-	}
-	return ac
-}
-
-// Start starts the asynchronous health check loop.
-func (ac *AsyncChecker) Start(ctx context.Context) {
-	go func() {
-		for {
-			err := ac.config.Check(ctx)
-			ac.store.UpdateStatus(ac.config.Name, err)
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(ac.interval):
-			}
-		}
-	}()
-}
-
-// HealthCheck returns the health.Component for the health-go library (for async checks).
-func (ac *AsyncChecker) HealthCheck() health.Component {
-	return ac.component.component
 }
 
 // Handler is a wrapper for health.Handler from "github.com/hellofresh/health-go/v5"
@@ -164,7 +62,6 @@ func NewHealthOptions(config HealthOptionsConfig) []health.Option {
 	return opts
 }
 
-// SetupHealthChecks sets up and registers health checks, returning the health.Health instance.
 func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkers ...HealthChecker) (*health.Health, error) {
 	h, err := health.New(
 		health.WithComponent(health.Component{
