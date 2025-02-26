@@ -57,7 +57,6 @@ func (c *S3Checker) Check(ctx context.Context) error {
 			case "AccessDenied":
 				return fmt.Errorf("access denied to s3 bucket %q: %w", c.config.BucketName, err)
 			default:
-				//return nil
 				return fmt.Errorf("s3 HeadBucket failed: %w", err)
 
 			}

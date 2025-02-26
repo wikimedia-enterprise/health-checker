@@ -62,6 +62,7 @@ func NewHealthOptions(config HealthOptionsConfig) []health.Option {
 	return opts
 }
 
+// SetupHealthChecks sets up and registers health checks, returning the health.Health instance.
 func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkers ...HealthChecker) (*health.Health, error) {
 	h, err := health.New(
 		health.WithComponent(health.Component{
