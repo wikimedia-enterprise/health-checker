@@ -11,19 +11,25 @@ import (
 	"time"
 )
 
+// HttpClient interface defines the method we need from an HTTP client.
+type HttpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 // KSQLDBCheckerConfig holds configuration for the KSQLDBChecker.
 type KSQLDBCheckerConfig struct {
 	Name     string
 	Endpoint string        // KSQLDB endpoint
 	Interval time.Duration // How often to run the async check
 	Timeout  time.Duration // Timeout *for the HTTP request*
+	Stream   string
 }
 
 // KSQLDBAsyncChecker implements the HealthChecker interface for asynchronous KSQLDB checks.
 type KSQLDBAsyncChecker struct {
 	store      *AsyncHealthStore
 	config     KSQLDBCheckerConfig
-	httpClient *http.Client
+	httpClient HttpClient
 	mu         sync.RWMutex
 }
 
@@ -33,7 +39,7 @@ const (
 )
 
 // NewKSQLDBAsyncChecker creates a new KSQLDBAsyncChecker.
-func NewKSQLDBAsyncChecker(KSQLURL string, dkt time.Duration, dki time.Duration) (*KSQLDBAsyncChecker, error) {
+func NewKSQLDBAsyncChecker(KSQLURL string, dkt time.Duration, dki time.Duration, stn string) (*KSQLDBAsyncChecker, error) {
 
 	if KSQLURL == "" {
 		return nil, fmt.Errorf("KSQLDB endpoint is required")
@@ -44,6 +50,7 @@ func NewKSQLDBAsyncChecker(KSQLURL string, dkt time.Duration, dki time.Duration)
 		Endpoint: KSQLURL,
 		Interval: dki,
 		Timeout:  dkt,
+		Stream:   stn,
 	}
 
 	client := &http.Client{
@@ -67,7 +74,7 @@ func (kac *KSQLDBAsyncChecker) ksqldbCheck(ctx context.Context) error {
 	checkCtx, cancel := context.WithTimeout(ctx, kac.config.Timeout)
 	defer cancel()
 
-	query := "SELECT * FROM rlt_articles_str_v4 EMIT CHANGES LIMIT 1;"
+	query := fmt.Sprintf("SELECT * FROM %s EMIT CHANGES LIMIT 1;", kac.config.Stream)
 
 	properties := map[string]string{
 		"ksql.streams.auto.offset.reset":     "latest",
@@ -90,17 +97,15 @@ func (kac *KSQLDBAsyncChecker) ksqldbCheck(ctx context.Context) error {
 
 	req.Header.Set("Content-Type", "application/vnd.ksql.v1+json")
 	req.Header.Set("Accept", "application/vnd.ksql.v1+json")
-	resp, err := kac.httpClient.Do(req)
 
+	resp, err := kac.httpClient.Do(req)
 	if err != nil {
-		fmt.Errorf(err.Error())
 		return fmt.Errorf("make KSQLDB request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		fmt.Printf("ksqld request failed, status: %d, body: %s", resp.StatusCode, string(body))
 		return fmt.Errorf("KSQLDB request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -145,5 +150,5 @@ func (kac *KSQLDBAsyncChecker) GetTimeOut() time.Duration {
 
 // Type returns the component type.
 func (kac *KSQLDBAsyncChecker) Type() string {
-	return defaultKSQLDBName // Consistent type
+	return defaultKSQLDBName
 }
