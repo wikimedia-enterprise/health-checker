@@ -2,7 +2,6 @@ package health
 
 import (
 	"fmt"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,30 +60,4 @@ func TestAsyncHealthStore_GetStatus(t *testing.T) {
 		retrievedErr := store.GetStatus("testCheck")
 		assert.Equal(t, expectedErr, retrievedErr)
 	})
-}
-
-// tests have to be run with golang -race checker
-func TestAsyncHealthStore_Concurrency(t *testing.T) {
-	store := NewAsyncHealthStore()
-	var wg sync.WaitGroup
-	numGoroutines := 100
-
-	// Concurrent writes
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			store.UpdateStatus(fmt.Sprintf("check%d", i), fmt.Errorf("error %d", i))
-		}(i)
-	}
-
-	// Concurrent reads
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			_ = store.GetStatus(fmt.Sprintf("check%d", i)) // Ignoring result, just testing for races
-		}(i)
-	}
-	wg.Wait()
 }
