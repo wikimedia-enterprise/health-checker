@@ -44,8 +44,6 @@ func NewS3Checker(config S3CheckerConfig) (*S3Checker, error) {
 
 // Check performs the S3 health check.
 func (c *S3Checker) Check(ctx context.Context) error {
-	fmt.Println("performing the actual s3 check")
-
 	_, err := c.s3Client.HeadBucketWithContext(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(c.config.BucketName),
 	})
