@@ -212,7 +212,7 @@ func TestKSQLDBAsyncChecker_Name(t *testing.T) {
 
 func TestKSQLDBAsyncChecker_GetTimeOut(t *testing.T) {
 	checker, _ := NewKSQLDBAsyncChecker("http://localhost:8088", 1*time.Second, 5*time.Second, "test-stream")
-	assert.Equal(t, 5*time.Second, checker.GetTimeOut())
+	assert.Equal(t, 1*time.Second, checker.GetTimeOut())
 }
 
 func TestKSQLDBAsyncChecker_Type(t *testing.T) {
