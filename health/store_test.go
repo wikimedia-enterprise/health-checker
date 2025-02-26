@@ -63,6 +63,7 @@ func TestAsyncHealthStore_GetStatus(t *testing.T) {
 	})
 }
 
+// tests have to be run with golang -race checker
 func TestAsyncHealthStore_Concurrency(t *testing.T) {
 	store := NewAsyncHealthStore()
 	var wg sync.WaitGroup
