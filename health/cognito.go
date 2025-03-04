@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
@@ -15,7 +14,6 @@ import (
 
 // CognitoChecker implements the HealthChecker interface for AWS Cognito.
 type CognitoChecker struct {
-	Timeout          time.Duration
 	CheckerName      string
 	UserPoolId       string
 	CognitoClientId  string
@@ -27,9 +25,6 @@ type CognitoChecker struct {
 
 // Check verifies the authentication flow with Cognito for a given username and password.
 func (c *CognitoChecker) Check(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, c.Timeout)
-	defer cancel()
-
 	h := hmac.New(sha256.New, []byte(c.CognitoSecret))
 
 	if _, err := h.Write([]byte(fmt.Sprintf("%s%s", c.TestUserName, c.CognitoClientId))); err != nil {
@@ -60,9 +55,4 @@ func (c *CognitoChecker) Name() string {
 // Type returns the type of the health check (cognito).
 func (c *CognitoChecker) Type() string {
 	return "cognito"
-}
-
-// GetTimeOut returns the deadline for the health check.
-func (c *CognitoChecker) GetTimeOut() time.Duration {
-	return c.Timeout
 }

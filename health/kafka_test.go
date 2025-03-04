@@ -57,7 +57,6 @@ func (s *KafkaCheckerTestSuite) SetupTest() {
 	cfg := SyncKafkaChecker{
 		Name:           "test-kafka",
 		Interval:       60 * time.Second,
-		Timeout:        20 * time.Second,
 		Producer:       s.mockProducer,
 		Consumer:       s.mockConsumer,
 		RequiredTopics: []string{"topic1"},

@@ -3,7 +3,6 @@ package health
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -31,7 +30,6 @@ func TestCognitoChecker_Check_Success(t *testing.T) {
 	mockCognito.On("InitiateAuthWithContext", mock.Anything, mock.Anything, mock.Anything).Return(&cognitoidentityprovider.InitiateAuthOutput{}, nil)
 
 	checker := CognitoChecker{
-		Timeout:          1 * time.Second,
 		CheckerName:      "test-cognito-check",
 		CognitoAPI:       mockCognito,
 		UserPoolId:       "pool-id",
@@ -57,7 +55,7 @@ func TestCognitoChecker_Check_OtherAWSError(t *testing.T) {
 	awsErr := awserr.New("SomeAWSError", "some aws error", nil)
 	mockCognito.On("InitiateAuthWithContext", mock.Anything, mock.Anything, mock.Anything).Return((*cognitoidentityprovider.InitiateAuthOutput)(nil), awsErr)
 
-	checker := CognitoChecker{CognitoAPI: mockCognito, CheckerName: "test", Timeout: time.Duration(10) * time.Second}
+	checker := CognitoChecker{CognitoAPI: mockCognito, CheckerName: "test"}
 	err := checker.Check(context.Background())
 
 	assert.Error(t, err)
@@ -71,30 +69,7 @@ func TestCognitoChecker_Getters(t *testing.T) {
 	checker := CognitoChecker{
 		CheckerName: "test-cognito-check",
 		CognitoAPI:  mockCognito,
-		Timeout:     5 * time.Second,
 	}
 	assert.Equal(t, "test-cognito-check", checker.Name())
 	assert.Equal(t, "cognito", checker.Type())
-	assert.Equal(t, 5*time.Second, checker.GetTimeOut())
-}
-
-func TestCognitoChecker_Check_ContextCancelled_DuringRequest(t *testing.T) {
-	mockCognito := new(MockCognitoClient)
-	mockCognito.On("InitiateAuthWithContext", mock.Anything, mock.Anything, mock.Anything).
-		Run(func(args mock.Arguments) {
-			time.Sleep(200 * time.Millisecond)
-		}).
-		Return((*cognitoidentityprovider.InitiateAuthOutput)(nil), context.DeadlineExceeded)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-	defer cancel()
-
-	checker := CognitoChecker{CognitoAPI: mockCognito, UserPoolId: "test", CheckerName: "Test", Timeout: 5 * time.Second}
-
-	err := checker.Check(ctx)
-
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Contains(t, err.Error(), "InitiateAuthWithContext failed")
-	mockCognito.AssertExpectations(t)
 }

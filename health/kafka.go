@@ -24,7 +24,6 @@ type ProducerClient interface {
 type SyncKafkaChecker struct {
 	Name     string        // Name of this health check.
 	Interval time.Duration // Interval for the health check, only for repeated checks.
-	Timeout  time.Duration // Timeout for the HTTP request.
 
 	Producer       ProducerClient
 	Consumer       ConsumerClient
@@ -53,9 +52,8 @@ func RegisterKafkaHealthChecks(h *health.Health, configs []SyncKafkaChecker, isA
 		}
 
 		checkConfig := health.Config{
-			Name:    checker.Name(),
-			Timeout: conf.Timeout,
-			Check:   checker.Check,
+			Name:  checker.Name(),
+			Check: checker.Check,
 		}
 
 		if err := h.Register(checkConfig); err != nil {
@@ -89,11 +87,6 @@ func (k *KafkaChecker) Check(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// GetTimeOut returns the timeout for the Kafka health check.
-func (k *KafkaChecker) GetTimeOut() time.Duration {
-	return 5 * time.Second
 }
 
 // Name returns the name of the Kafka health check.
@@ -228,9 +221,4 @@ func (akc *AsyncKafkaChecker) Name() string {
 // Type returns the type of the health check.
 func (akc *AsyncKafkaChecker) Type() string {
 	return "kafka-async"
-}
-
-// GetTimeOut returns the timeout for the Kafka health check.
-func (k *AsyncKafkaChecker) GetTimeOut() time.Duration {
-	return 5 * time.Second
 }

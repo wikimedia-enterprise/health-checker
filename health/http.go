@@ -4,13 +4,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 )
 
 // HTTPCheckerConfig holds configuration for the HTTPChecker.
 type HTTPCheckerConfig struct {
 	URL            string
-	Timeout        time.Duration
 	Name           string
 	ExpectedStatus int
 }
@@ -22,10 +20,6 @@ type HTTPChecker struct {
 
 // NewHTTPChecker creates a new HTTPChecker.
 func NewHTTPChecker(config HTTPCheckerConfig) *HTTPChecker {
-	// Set a default timeout if none provided
-	if config.Timeout == 0 {
-		config.Timeout = 5 * time.Second
-	}
 	if config.ExpectedStatus == 0 {
 		config.ExpectedStatus = http.StatusOK
 	}
@@ -40,9 +34,7 @@ func (c *HTTPChecker) Check(ctx context.Context) error {
 		return fmt.Errorf("creating request failed: %w", err)
 	}
 
-	client := &http.Client{
-		Timeout: c.config.Timeout,
-	}
+	client := &http.Client{}
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -55,10 +47,6 @@ func (c *HTTPChecker) Check(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-func (c *HTTPChecker) GetTimeOut() time.Duration {
-	return c.config.Timeout
 }
 
 // Name returns the name of the health check.

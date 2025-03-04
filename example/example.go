@@ -4,7 +4,6 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	healthchecks "github.com/wikimedia-enterprise/health-checker/health"
 
@@ -46,13 +45,11 @@ type dummyEnv struct {
 func main() {
 	httpChecker1 := healthchecks.NewHTTPChecker(healthchecks.HTTPCheckerConfig{
 		URL:            "https://www.wikipedia.org",
-		Timeout:        5 * time.Second,
 		Name:           "wikipedia-http-check",
 		ExpectedStatus: http.StatusOK,
 	})
 	httpChecker2 := healthchecks.NewHTTPChecker(healthchecks.HTTPCheckerConfig{
 		URL:            "https://www.wikimedia.org",
-		Timeout:        5 * time.Second,
 		Name:           "wikimedia-http-check",
 		ExpectedStatus: http.StatusOK,
 	})
@@ -73,7 +70,6 @@ func main() {
 	s3Checker, err := healthchecks.NewS3Checker(healthchecks.S3CheckerConfig{
 		BucketName: "your-bucket-name",
 		Name:       "s3-bucket-check",
-		Timeout:    5 * time.Second,
 		S3Client:   s3Client,
 	})
 	if err != nil {
