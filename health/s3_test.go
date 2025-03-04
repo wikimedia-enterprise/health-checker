@@ -34,7 +34,6 @@ func TestS3Checker_Check_Success(t *testing.T) {
 
 	config := S3CheckerConfig{
 		BucketName: "test-bucket",
-		Timeout:    1 * time.Second,
 		Name:       "test-s3-check",
 		Region:     "us-east-1",
 		S3Client:   mockS3,
@@ -62,27 +61,6 @@ func TestS3Checker_Check_OtherAWSError(t *testing.T) {
 	mockS3.AssertExpectations(t)
 }
 
-func TestS3Checker_NewS3Checker_DefaultTimeout(t *testing.T) {
-	mockS3 := new(MockS3Client)
-	mockS3.On("HeadBucketWithContext", mock.Anything, &s3.HeadBucketInput{
-		Bucket: aws.String("test-bucket"),
-	}, mock.Anything).Return(&s3.HeadBucketOutput{}, nil)
-
-	config := S3CheckerConfig{
-		BucketName: "test-bucket",
-		Name:       "test-s3-check",
-		Region:     "us-east-1",
-		S3Client:   mockS3,
-	}
-	checker, err := NewS3Checker(config)
-
-	if err != nil {
-		t.Fatalf("NewS3Checker returned an unexpected error: %v", err)
-	}
-
-	assert.Equal(t, 5*time.Second, checker.config.Timeout)
-	assert.Equal(t, 5*time.Second, checker.GetTimeOut())
-}
 func TestS3Checker_NewS3Checker_SessionCreationError(t *testing.T) {
 	config := S3CheckerConfig{
 		BucketName: "test-bucket",
@@ -94,15 +72,6 @@ func TestS3Checker_NewS3Checker_SessionCreationError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.EqualError(t, err, "failed to create AWS session: no S3 interface detected")
-}
-func TestS3Checker_GetTimeout(t *testing.T) {
-	mockS3 := new(MockS3Client)
-	config := S3CheckerConfig{Timeout: 10 * time.Second, Name: "test", BucketName: "test", S3Client: mockS3}
-	checker, err := NewS3Checker(config)
-	if err != nil {
-		t.Fatalf("NewS3Checker returned an unexpected error: %v", err)
-	}
-	assert.Equal(t, 10*time.Second, checker.GetTimeOut())
 }
 
 func TestS3Checker_Name(t *testing.T) {
@@ -136,7 +105,7 @@ func TestS3Checker_Check_ContextCancelled_DuringRequest(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	config := S3CheckerConfig{S3Client: mockS3, BucketName: "test", Name: "Test", Timeout: 5 * time.Second}
+	config := S3CheckerConfig{S3Client: mockS3, BucketName: "test", Name: "Test"}
 	checker, _ := NewS3Checker(config)
 
 	err := checker.Check(ctx)

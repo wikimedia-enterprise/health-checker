@@ -36,7 +36,6 @@ import (
 func main() {
 	httpChecker := health.NewHTTPChecker(health.HTTPCheckerConfig{
 		URL:            "https://www.wikipedia.org",
-		Timeout:        5 * time.Second,
 		Name:           "wikipedia-http-check",
 		ExpectedStatus: http.StatusOK,
 	})
@@ -81,7 +80,6 @@ func main() {
 	s3Checker, err := health.NewS3Checker(health.S3CheckerConfig{
 		BucketName: "my-bucket",
 		Name:       "s3-bucket-check",
-		Timeout:    5 * time.Second,
 		S3Client:   s3Client,
 	})
 	if err != nil {
@@ -117,7 +115,6 @@ func main() {
 	kafkaChecker := health.NewAsyncKafkaChecker(health.NewSyncKafkaChecker(health.SyncKafkaChecker{
 		Name:           "kafka-health-check",
 		Interval:       10 * time.Second,
-		Timeout:        5 * time.Second,
 		Producer:       nil, // Provide a valid producer client
 		Consumer:       nil, // Provide a valid consumer client
 		RequiredTopics: []string{"test-topic"},
@@ -162,15 +159,15 @@ func main() {
 	s3Client := s3.New(sess)
 
 	httpChecker := health.NewHTTPChecker(health.HTTPCheckerConfig{
-		URL: "https://www.wikipedia.org", Timeout: 5 * time.Second, Name: "wikipedia-http-check", ExpectedStatus: http.StatusOK,
+		URL: "https://www.wikipedia.org", Name: "wikipedia-http-check", ExpectedStatus: http.StatusOK,
 	})
 
 	s3Checker, _ := health.NewS3Checker(health.S3CheckerConfig{
-		BucketName: "my-bucket", Name: "s3-bucket-check", Timeout: 5 * time.Second, S3Client: s3Client,
+		BucketName: "my-bucket", Name: "s3-bucket-check", S3Client: s3Client,
 	})
 
 	kafkaChecker := health.NewAsyncKafkaChecker(health.NewSyncKafkaChecker(health.SyncKafkaChecker{
-		Name: "kafka-health-check", Interval: 10 * time.Second, Timeout: 5 * time.Second, RequiredTopics: []string{"test-topic"},
+		Name: "kafka-health-check", Interval: 10 * time.Second, RequiredTopics: []string{"test-topic"},
 	}, health.NewConsumerOffsetStore()))
 
 	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, httpChecker, s3Checker, kafkaChecker)

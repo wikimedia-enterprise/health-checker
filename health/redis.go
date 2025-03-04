@@ -3,15 +3,13 @@ package health
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-redis/redis/v8"
 )
 
 // RedisCheckerConfig holds configuration for the RedisChecker.
 type RedisCheckerConfig struct {
-	Timeout time.Duration
-	Name    string
+	Name string
 }
 
 // RedisChecker implements the HealthChecker interface for Redis.
@@ -22,14 +20,8 @@ type RedisChecker struct {
 
 // NewRedisChecker creates a new RedisChecker using an existing redis.Cmdable client.
 func NewRedisChecker(client redis.Cmdable, config RedisCheckerConfig) (*RedisChecker, error) {
-	if config.Timeout == 0 {
-		config.Timeout = 5 * time.Second // Default timeout
-	}
-
 	// Test the connection to ensure the client is valid
-	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
-	defer cancel()
-	if _, err := client.Ping(ctx).Result(); err != nil {
+	if _, err := client.Ping(context.Background()).Result(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
@@ -54,9 +46,4 @@ func (c *RedisChecker) Name() string {
 // Type returns the type of the health check (redis).
 func (c *RedisChecker) Type() string {
 	return "redis"
-}
-
-// GetTimeOut returns the timeout for the health check.
-func (c *RedisChecker) GetTimeOut() time.Duration {
-	return c.config.Timeout
 }

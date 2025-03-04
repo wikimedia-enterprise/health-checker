@@ -3,7 +3,6 @@ package health
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -14,7 +13,6 @@ import (
 // S3CheckerConfig holds configuration for the S3Checker.
 type S3CheckerConfig struct {
 	BucketName string
-	Timeout    time.Duration
 	Name       string
 	Region     string
 	S3Client   s3iface.S3API
@@ -28,10 +26,6 @@ type S3Checker struct {
 
 // NewS3Checker creates a new S3Checker.  Handles optional client injection.
 func NewS3Checker(config S3CheckerConfig) (*S3Checker, error) {
-	if config.Timeout == 0 {
-		config.Timeout = 5 * time.Second
-	}
-
 	var client s3iface.S3API
 	if config.S3Client != nil {
 		client = config.S3Client
@@ -73,8 +67,4 @@ func (c *S3Checker) Name() string {
 // Type returns the type of the health check (s3).
 func (c *S3Checker) Type() string {
 	return "s3"
-}
-
-func (c *S3Checker) GetTimeOut() time.Duration {
-	return c.config.Timeout
 }

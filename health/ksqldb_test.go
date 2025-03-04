@@ -33,7 +33,6 @@ func TestNewKSQLDBAsyncChecker(t *testing.T) {
 		assert.NotNil(t, checker)
 		assert.Equal(t, defaultKSQLDBName, checker.config.Name)
 		assert.Equal(t, "http://localhost:8088", checker.config.Endpoint)
-		assert.Equal(t, 1*time.Second, checker.config.Timeout)
 		assert.Equal(t, 5*time.Second, checker.config.Interval)
 		assert.Equal(t, "test-stream", checker.config.Stream)
 
@@ -107,22 +106,6 @@ func TestKSQLDBAsyncChecker_ksqldbCheck(t *testing.T) {
 		err := checker.ksqldbCheck(context.Background())
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "KSQLDB request failed with status 500: KSQLDB Error")
-	})
-
-	t.Run("Context Timeout", func(t *testing.T) {
-		// Mock HTTP server that *always* times out
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			time.Sleep(2 * time.Second)  // Simulate a delay *longer* than the checker's timeout
-			w.WriteHeader(http.StatusOK) // This line will *never* be reached
-			_, _ = w.Write([]byte(`{}`))
-		}))
-		defer server.Close()
-
-		checker, _ := NewKSQLDBAsyncChecker(server.URL, 1*time.Second, 100*time.Millisecond, "test-stream")
-
-		err := checker.ksqldbCheck(context.Background())
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "context deadline exceeded")
 	})
 
 	t.Run("Successful Response with body", func(t *testing.T) {
@@ -208,11 +191,6 @@ func TestKSQLDBAsyncChecker_Check(t *testing.T) {
 func TestKSQLDBAsyncChecker_Name(t *testing.T) {
 	checker, _ := NewKSQLDBAsyncChecker("http://localhost:8088", 1*time.Second, 5*time.Second, "test-stream")
 	assert.Equal(t, defaultKSQLDBName, checker.Name())
-}
-
-func TestKSQLDBAsyncChecker_GetTimeOut(t *testing.T) {
-	checker, _ := NewKSQLDBAsyncChecker("http://localhost:8088", 1*time.Second, 5*time.Second, "test-stream")
-	assert.Equal(t, 1*time.Second, checker.GetTimeOut())
 }
 
 func TestKSQLDBAsyncChecker_Type(t *testing.T) {

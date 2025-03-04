@@ -21,7 +21,6 @@ type KSQLDBCheckerConfig struct {
 	Name     string
 	Endpoint string        // KSQLDB endpoint
 	Interval time.Duration // How often to run the async check
-	Timeout  time.Duration // Timeout *for the HTTP request*
 	Stream   string
 }
 
@@ -49,13 +48,10 @@ func NewKSQLDBAsyncChecker(KSQLURL string, dkt time.Duration, dki time.Duration,
 		Name:     defaultKSQLDBName,
 		Endpoint: KSQLURL,
 		Interval: dki,
-		Timeout:  dkt,
 		Stream:   stn,
 	}
 
-	client := &http.Client{
-		Timeout: config.Timeout,
-	}
+	client := &http.Client{}
 
 	store := NewAsyncHealthStore()
 
@@ -71,9 +67,6 @@ func NewKSQLDBAsyncChecker(KSQLURL string, dkt time.Duration, dki time.Duration,
 
 // ksqldbCheck is the actual asynchronous KSQLDB check function.
 func (kac *KSQLDBAsyncChecker) ksqldbCheck(ctx context.Context) error {
-	checkCtx, cancel := context.WithTimeout(ctx, kac.config.Timeout)
-	defer cancel()
-
 	query := fmt.Sprintf("SELECT * FROM %s EMIT CHANGES LIMIT 1;", kac.config.Stream)
 
 	properties := map[string]string{
@@ -90,7 +83,7 @@ func (kac *KSQLDBAsyncChecker) ksqldbCheck(ctx context.Context) error {
 		return fmt.Errorf("marshal request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(checkCtx, http.MethodPost, kac.config.Endpoint+"/query-stream", bytes.NewReader(requestBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, kac.config.Endpoint+"/query-stream", bytes.NewReader(requestBody))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -141,11 +134,6 @@ func (kac *KSQLDBAsyncChecker) Check(ctx context.Context) error {
 // Name returns the component name.
 func (kac *KSQLDBAsyncChecker) Name() string {
 	return kac.config.Name
-}
-
-// GetTimeOut returns the timeout
-func (kac *KSQLDBAsyncChecker) GetTimeOut() time.Duration {
-	return kac.config.Timeout
 }
 
 // Type returns the component type.

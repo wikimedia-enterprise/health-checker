@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/hellofresh/health-go/v5"
 	"github.com/stretchr/testify/assert"
@@ -32,20 +31,10 @@ func (m *MockHealthChecker) Type() string {
 	return args.String(0)
 }
 
-func (m *MockHealthChecker) isAsync() bool {
-	return false
-}
-
-func (m *MockHealthChecker) GetTimeOut() time.Duration {
-	args := m.Called()
-	return args.Get(0).(time.Duration)
-}
-
 func TestSetupHealthChecks_Success(t *testing.T) {
 	mockChecker := new(MockHealthChecker)
 	mockChecker.On("Check", mock.Anything).Return(nil)
 	mockChecker.On("Name").Return("mock-check")
-	mockChecker.On("GetTimeOut").Return(5 * time.Second)
 
 	h, err := SetupHealthChecks("test-service", "v1.0.0", false, mockChecker)
 

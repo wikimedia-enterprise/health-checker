@@ -9,12 +9,15 @@ import (
 	"github.com/hellofresh/health-go/v5"
 )
 
+const (
+	NoTimeout = time.Duration(24) * time.Hour
+)
+
 // HealthChecker is the interface that all health checks must implement.
 type HealthChecker interface {
 	Check(ctx context.Context) error
 	Name() string
 	Type() string // e.g., "redis", "s3", "kafka", "http"
-	GetTimeOut() time.Duration
 }
 
 // Handler is a wrapper for health.Handler from "github.com/hellofresh/health-go/v5"
@@ -83,8 +86,8 @@ func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo 
 	for _, checker := range checkers {
 		checkConfig := health.Config{
 			Name:    checker.Name(),
-			Timeout: checker.GetTimeOut(),
 			Check:   checker.Check,
+			Timeout: NoTimeout,
 		}
 		if err := h.Register(checkConfig); err != nil {
 			return nil, fmt.Errorf("failed to register check %q: %w", checker.Name(), err)
