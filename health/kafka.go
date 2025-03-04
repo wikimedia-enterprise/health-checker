@@ -52,8 +52,9 @@ func RegisterKafkaHealthChecks(h *health.Health, configs []SyncKafkaChecker, isA
 		}
 
 		checkConfig := health.Config{
-			Name:  checker.Name(),
-			Check: checker.Check,
+			Name:    checker.Name(),
+			Check:   checker.Check,
+			Timeout: NoTimeout,
 		}
 
 		if err := h.Register(checkConfig); err != nil {
