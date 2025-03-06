@@ -44,14 +44,14 @@ type dummyEnv struct {
 
 func main() {
 	httpChecker1 := healthchecks.NewHTTPChecker(healthchecks.HTTPCheckerConfig{
-		URL:            "https://www.wikipedia.org",
-		Name:           "wikipedia-http-check",
-		ExpectedStatus: http.StatusOK,
+		URL:              "https://www.wikipedia.org",
+		Name:             "wikipedia-http-check",
+		ExpectedStatuses: []int{http.StatusOK},
 	})
 	httpChecker2 := healthchecks.NewHTTPChecker(healthchecks.HTTPCheckerConfig{
-		URL:            "https://www.wikimedia.org",
-		Name:           "wikimedia-http-check",
-		ExpectedStatus: http.StatusOK,
+		URL:              "https://www.wikimedia.org",
+		Name:             "wikimedia-http-check",
+		ExpectedStatuses: []int{http.StatusOK},
 	})
 
 	sess, err := session.NewSession(&aws.Config{

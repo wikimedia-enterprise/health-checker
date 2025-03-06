@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 )
 
 // HTTPCheckerConfig holds configuration for the HTTPChecker.
 type HTTPCheckerConfig struct {
-	URL            string
-	Name           string
-	ExpectedStatus int
+	URL              string
+	Name             string
+	ExpectedStatuses []int
 }
 
 // HTTPChecker implements the HealthChecker interface for HTTP endpoints.
@@ -20,8 +21,8 @@ type HTTPChecker struct {
 
 // NewHTTPChecker creates a new HTTPChecker.
 func NewHTTPChecker(config HTTPCheckerConfig) *HTTPChecker {
-	if config.ExpectedStatus == 0 {
-		config.ExpectedStatus = http.StatusOK
+	if len(config.ExpectedStatuses) == 0 {
+		config.ExpectedStatuses = []int{http.StatusOK}
 	}
 
 	return &HTTPChecker{config: config}
@@ -42,8 +43,8 @@ func (c *HTTPChecker) Check(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	if c.config.ExpectedStatus != 0 && resp.StatusCode != c.config.ExpectedStatus {
-		return fmt.Errorf("unexpected status code: got %d, want %d", resp.StatusCode, c.config.ExpectedStatus)
+	if !slices.Contains(c.config.ExpectedStatuses, resp.StatusCode) {
+		return fmt.Errorf("unexpected status code: got %d, want %v", resp.StatusCode, c.config.ExpectedStatuses)
 	}
 
 	return nil
