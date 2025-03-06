@@ -16,9 +16,9 @@ func TestHTTPChecker_Check_Success(t *testing.T) {
 	defer server.Close()
 
 	config := HTTPCheckerConfig{
-		URL:            server.URL,
-		Name:           "test-http-check",
-		ExpectedStatus: http.StatusOK,
+		URL:              server.URL,
+		Name:             "test-http-check",
+		ExpectedStatuses: []int{http.StatusTooManyRequests, http.StatusOK},
 	}
 	checker := NewHTTPChecker(config)
 
@@ -28,9 +28,9 @@ func TestHTTPChecker_Check_Success(t *testing.T) {
 
 func TestHTTPChecker_Check_RequestCreationError(t *testing.T) {
 	config := HTTPCheckerConfig{
-		URL:            "://invalid-url",
-		Name:           "test-http-check",
-		ExpectedStatus: http.StatusOK,
+		URL:              "://invalid-url",
+		Name:             "test-http-check",
+		ExpectedStatuses: []int{http.StatusOK},
 	}
 	checker := NewHTTPChecker(config)
 
@@ -48,9 +48,9 @@ func TestHTTPChecker_Check_UnexpectedStatusCode(t *testing.T) {
 	defer server.Close()
 
 	config := HTTPCheckerConfig{
-		URL:            server.URL,
-		Name:           "test-http-check",
-		ExpectedStatus: http.StatusOK,
+		URL:              server.URL,
+		Name:             "test-http-check",
+		ExpectedStatuses: []int{http.StatusOK},
 	}
 	checker := NewHTTPChecker(config)
 
@@ -67,7 +67,7 @@ func TestHTTPChecker_NewHTTPChecker_DefaultExpectedStatus(t *testing.T) {
 	}
 
 	checker := NewHTTPChecker(config)
-	assert.Equal(t, http.StatusOK, checker.config.ExpectedStatus) // default status is 200 OK
+	assert.Equal(t, []int{http.StatusOK}, checker.config.ExpectedStatuses) // default status is 200 OK
 }
 
 func TestHTTPChecker_Name(t *testing.T) {
@@ -95,9 +95,9 @@ func TestHTTPChecker_Check_ContextCancelled_BeforeRequest(t *testing.T) {
 	cancel()
 
 	config := HTTPCheckerConfig{
-		URL:            "http://example.com",
-		Name:           "test-http-check",
-		ExpectedStatus: http.StatusOK,
+		URL:              "http://example.com",
+		Name:             "test-http-check",
+		ExpectedStatuses: []int{http.StatusOK},
 	}
 	checker := NewHTTPChecker(config)
 	err := checker.Check(ctx)
