@@ -68,7 +68,20 @@ func TestGrpcCheckSuccess_successResponse(t *testing.T) {
 	client, closer := StartGrpcServer(ctx)
 	defer closer()
 
-	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{Bar: "baz"}, codes.OK)
+	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{Bar: "baz"}, []codes.Code{codes.OK})
+	assert.Nil(t, err)
+
+	err = grpcChecker.Check(ctx)
+	assert.Nil(t, err)
+}
+
+func TestGrpcCheckSuccess_successResponse_defaultStatus(t *testing.T) {
+	ctx := context.Background()
+	client, closer := StartGrpcServer(ctx)
+	defer closer()
+
+	// Will default to OK.
+	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{Bar: "baz"}, nil)
 	assert.Nil(t, err)
 
 	err = grpcChecker.Check(ctx)
@@ -80,7 +93,7 @@ func TestGrpcCheckSuccess_errorResponse(t *testing.T) {
 	client, closer := StartGrpcServer(ctx)
 	defer closer()
 
-	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{}, codes.InvalidArgument)
+	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{}, []codes.Code{codes.InvalidArgument})
 	assert.Nil(t, err)
 
 	err = grpcChecker.Check(ctx)
@@ -92,7 +105,7 @@ func TestGrpcCheckFails_successResponse(t *testing.T) {
 	client, closer := StartGrpcServer(ctx)
 	defer closer()
 
-	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{Bar: "baz"}, codes.InvalidArgument)
+	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{Bar: "baz"}, []codes.Code{codes.InvalidArgument})
 	assert.Nil(t, err)
 
 	err = grpcChecker.Check(ctx)
@@ -104,7 +117,7 @@ func TestGrpcCheckFails_errorResponse(t *testing.T) {
 	client, closer := StartGrpcServer(ctx)
 	defer closer()
 
-	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{}, codes.NotFound)
+	grpcChecker, err := NewGrpcChecker("test", client.Foo, &protos.FooRequest{}, []codes.Code{codes.NotFound})
 	assert.Nil(t, err)
 
 	err = grpcChecker.Check(ctx)
