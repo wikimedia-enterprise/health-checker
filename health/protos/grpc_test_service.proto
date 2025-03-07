@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package protos;
+
+option go_package = "./;protos";
+
+// Service method definitions
+service TestService {
+  rpc Foo(FooRequest) returns (FooResponse);
+}
+
+// FooRequest params needed to make request
+message FooRequest {
+  string bar = 1;
+}
+
+// FooResponse result of the request
+message FooResponse {}
