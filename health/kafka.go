@@ -223,3 +223,17 @@ func (akc *AsyncKafkaChecker) Name() string {
 func (akc *AsyncKafkaChecker) Type() string {
 	return "kafka-async"
 }
+
+func SetUpKafkaCheckers(ctx context.Context, rts []string, producer *kafka.Producer, itl int, lag int,
+	consumer *kafka.Consumer) *AsyncKafkaChecker {
+	kafka := NewAsyncKafkaChecker(NewSyncKafkaChecker(SyncKafkaChecker{
+		Name:           "kafka-health-check",
+		Interval:       time.Duration(itl) * time.Millisecond,
+		Producer:       producer,
+		Consumer:       consumer,
+		RequiredTopics: rts,
+		MaxLag:         int64(lag),
+	}, NewConsumerOffsetStore()))
+
+	return kafka
+}
