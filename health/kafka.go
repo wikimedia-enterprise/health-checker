@@ -225,7 +225,7 @@ func (akc *AsyncKafkaChecker) Type() string {
 }
 
 func SetUpCheckers(ctx context.Context, rts []string, producer *kafka.Producer, itl int, lag int,
-	consumer *kafka.Consumer, src string, vrs string) *AsyncKafkaChecker {
+	consumer *kafka.Consumer) *AsyncKafkaChecker {
 	kafka := NewAsyncKafkaChecker(NewSyncKafkaChecker(SyncKafkaChecker{
 		Name:           "kafka-health-check",
 		Interval:       time.Duration(itl) * time.Millisecond,
