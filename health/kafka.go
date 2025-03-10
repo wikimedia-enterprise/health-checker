@@ -3,7 +3,6 @@ package health
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -226,7 +225,7 @@ func (akc *AsyncKafkaChecker) Type() string {
 }
 
 func SetUpCheckers(ctx context.Context, rts []string, producer *kafka.Producer, itl int, lag int,
-	consumer *kafka.Consumer, src string, vrs string) (*health.Health, func()) {
+	consumer *kafka.Consumer, src string, vrs string) *AsyncKafkaChecker {
 	kafka := NewAsyncKafkaChecker(NewSyncKafkaChecker(SyncKafkaChecker{
 		Name:           "kafka-health-check",
 		Interval:       time.Duration(itl) * time.Millisecond,
@@ -236,13 +235,5 @@ func SetUpCheckers(ctx context.Context, rts []string, producer *kafka.Producer, 
 		MaxLag:         int64(lag),
 	}, NewConsumerOffsetStore()))
 
-	h, err := SetupHealthChecks(src, vrs, true, kafka)
-	if err != nil {
-		log.Fatalf("Failed to set up health checks: %v\n", err)
-	}
-
-	kafkaCtx, cancel := context.WithCancel(ctx)
-	kafka.Start(kafkaCtx)
-
-	return h, cancel
+	return kafka
 }
