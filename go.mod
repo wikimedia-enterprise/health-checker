@@ -4,7 +4,7 @@ go 1.22.3
 
 require (
 	github.com/aws/aws-sdk-go v1.55.6
-	github.com/confluentinc/confluent-kafka-go v1.9.2
+	github.com/confluentinc/confluent-kafka-go v1.9.3-RC3
 	github.com/hellofresh/health-go/v5 v5.5.3
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.68.1
