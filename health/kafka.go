@@ -102,6 +102,15 @@ func (k *KafkaChecker) Shutdown() {
 	k.wg.Wait()
 }
 
+func (k *KafkaChecker) ProcessRebalance(consumer *kafka.Consumer, event kafka.Event) error {
+	switch e := event.(type) {
+	case kafka.RevokedPartitions:
+		k.offsetStore.RevokePartitions(e.Partitions)
+	}
+
+	return nil
+}
+
 // checkProducer checks that the producer can access the required topics.
 func checkProducer(producer ProducerClient, requiredTopics []string) error {
 	metadata, err := producer.GetMetadata(nil, true, 5000)
