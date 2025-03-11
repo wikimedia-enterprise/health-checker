@@ -65,8 +65,33 @@ func NewHealthOptions(config HealthOptionsConfig) []health.Option {
 	return opts
 }
 
+type CheckCallback func(checkName string, checkType string, result error)
+
+type HealthCheckerWrapper struct {
+	HealthChecker
+	callback CheckCallback
+}
+
+func (w HealthCheckerWrapper) Check(ctx context.Context) error {
+	result := w.HealthChecker.Check(ctx)
+	if w.callback != nil {
+		w.callback(w.Name(), w.Type(), result)
+	}
+	return result
+}
+
+func wrapCheckerForCallback(cb CheckCallback, checker HealthChecker) HealthChecker {
+	if cb == nil {
+		return checker
+	}
+
+	return HealthCheckerWrapper{HealthChecker: checker, callback: cb}
+}
+
 // SetupHealthChecks sets up and registers health checks, returning the health.Health instance.
-func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkers ...HealthChecker) (*health.Health, error) {
+//
+// checkCallback, if provided, will be invoked with the result of each checker.
+func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkCallback CheckCallback, checkers ...HealthChecker) (*health.Health, error) {
 	h, err := health.New(
 		health.WithComponent(health.Component{
 			Name:    componentName,
@@ -84,6 +109,7 @@ func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo 
 	}
 
 	for _, checker := range checkers {
+		checker = wrapCheckerForCallback(checkCallback, checker)
 		checkConfig := health.Config{
 			Name:    checker.Name(),
 			Check:   checker.Check,
