@@ -153,3 +153,85 @@ func (suite *AsyncKafkaCheckerTestSuite) TestAsyncKafkaCheckerMethods() {
 func TestAsyncKafkaCheckerTestSuite(t *testing.T) {
 	suite.Run(t, new(AsyncKafkaCheckerTestSuite))
 }
+
+type KafkaCheckerSetupTestSuite struct {
+	suite.Suite
+	producer       *kafka.Producer
+	consumer       *kafka.Consumer
+	requiredTopics []string
+}
+
+func (s *KafkaCheckerSetupTestSuite) SetupSuite() {
+	producerConfig := &kafka.ConfigMap{
+		"bootstrap.servers": getKafkaBootstrapServers(),
+	}
+	var err error
+
+	s.producer, err = kafka.NewProducer(producerConfig)
+	s.Require().NoError(err, "Failed to create Kafka producer")
+
+	consumerConfig := &kafka.ConfigMap{
+		"bootstrap.servers":        getKafkaBootstrapServers(),
+		"group.id":                 "kafka-checker-setup-test-group",
+		"auto.offset.reset":        "earliest",
+		"go.events.channel.enable": true,
+	}
+
+	s.consumer, err = kafka.NewConsumer(consumerConfig)
+	s.Require().NoError(err, "Failed to create Kafka consumer")
+
+	s.requiredTopics = []string{"test-topic-1", "test-topic-2"}
+	err = s.consumer.SubscribeTopics(s.requiredTopics, nil)
+	s.Require().NoError(err, "Failed to subscribe to topics")
+
+}
+
+func (s *KafkaCheckerSetupTestSuite) TearDownSuite() {
+	if s.producer != nil {
+		s.producer.Close()
+	}
+	if s.consumer != nil {
+		s.consumer.Close()
+	}
+}
+
+func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
+	ctx := context.Background()
+	intervalMS := 2000
+	lag := 5
+
+	checker := SetUpKafkaCheckers(ctx, s.requiredTopics, s.producer, intervalMS, lag, s.consumer)
+
+	s.Require().NotNil(checker, "SetUpKafkaCheckers returned nil")
+	s.Equal("kafka-health-check", checker.Name())
+	s.Equal("kafka-async", checker.Type())
+	s.Equal(time.Duration(intervalMS)*time.Millisecond, checker.checker.checker.Interval)
+	s.Equal(int64(lag), checker.checker.checker.MaxLag)
+	s.Equal(s.requiredTopics, checker.checker.checker.RequiredTopics)
+	s.Require().NotNil(checker.checker.checker.Producer)
+	s.Require().NotNil(checker.checker.checker.Consumer)
+
+	producer, ok := checker.checker.checker.Producer.(*kafka.Producer)
+	s.True(ok)
+	s.Equal(s.producer, producer)
+
+	consumer, ok := checker.checker.checker.Consumer.(*kafka.Consumer)
+	s.True(ok)
+	s.Equal(s.consumer, consumer)
+
+	checker.Start(ctx)
+	time.Sleep(50 * time.Millisecond)
+
+	err := checker.Check(ctx)
+	s.NoError(err)
+
+}
+
+func TestKafkaCheckerSetupTestSuite(t *testing.T) {
+	suite.Run(t, new(KafkaCheckerSetupTestSuite))
+}
+
+func getKafkaBootstrapServers() string {
+	servers := "localhost:9092"
+	return servers
+}
