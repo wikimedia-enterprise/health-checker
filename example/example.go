@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -76,7 +77,13 @@ func main() {
 		log.Fatalf("Failed to create S3 checker: %v", err)
 	}
 
-	h, err := healthchecks.SetupHealthChecks("MyService", "1.0.0", true, httpChecker1, httpChecker2, s3Checker)
+	loggerCallback := func(name string, checkType string, result error) {
+		if result != nil {
+			fmt.Printf("Error from %s: %v\n", name, result)
+		}
+	}
+
+	h, err := healthchecks.SetupHealthChecks("MyService", "1.0.0", true, loggerCallback, httpChecker1, httpChecker2, s3Checker)
 	if err != nil {
 		log.Fatalf("Failed to setup health checks: %v", err)
 	}

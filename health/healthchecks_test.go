@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -36,7 +37,7 @@ func TestSetupHealthChecks_Success(t *testing.T) {
 	mockChecker.On("Check", mock.Anything).Return(nil)
 	mockChecker.On("Name").Return("mock-check")
 
-	h, err := SetupHealthChecks("test-service", "v1.0.0", false, mockChecker)
+	h, err := SetupHealthChecks("test-service", "v1.0.0", false, nil, mockChecker)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, h)
@@ -85,4 +86,33 @@ func TestHandler(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	assert.Equal(t, http.StatusOK, rr.Code)
 
+}
+
+func TestCallback(t *testing.T) {
+	checkResult := errors.New("check result")
+
+	mockChecker := new(MockHealthChecker)
+	mockChecker.On("Check", mock.Anything).Return(checkResult)
+	mockChecker.On("Name").Return("mock-check")
+	mockChecker.On("Type").Return("check type")
+
+	var result error
+	cb := func(n string, t string, res error) {
+		result = res
+	}
+	h, err := SetupHealthChecks("test-service", "v1.0.0", false, cb, mockChecker)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, h)
+
+	// Test if the check is invoked
+	req, _ := http.NewRequest("GET", "/healthz", nil)
+	rr := httptest.NewRecorder()
+	h.Handler().ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusServiceUnavailable, rr.Code)
+
+	mockChecker.AssertExpectations(t)
+
+	assert.Equal(t, checkResult, result)
 }
