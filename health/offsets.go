@@ -53,3 +53,17 @@ func (s *ConsumerOffsetStore) SetOffsets(topic string, partition int32, position
 	s.positions[topic][partition] = position
 	s.commits[topic][partition] = commit
 }
+
+func (s *ConsumerOffsetStore) RevokePartitions(revoked []kafka.TopicPartition) {
+	for _, partition := range revoked {
+		if partition.Topic == nil {
+			continue
+		}
+		if topic, exists := s.positions[*partition.Topic]; exists {
+			delete(topic, partition.Partition)
+		}
+		if topic, exists := s.commits[*partition.Topic]; exists {
+			delete(topic, partition.Partition)
+		}
+	}
+}
