@@ -88,10 +88,38 @@ func wrapCheckerForCallback(cb CheckCallback, checker HealthChecker) HealthCheck
 	return HealthCheckerWrapper{HealthChecker: checker, callback: cb}
 }
 
-// SetupHealthChecks sets up and registers health checks, returning the health.Health instance.
+// SetupHealthChecks sets up and registers health checks with retries, returning the health.Health instance.
 //
-// checkCallback, if provided, will be invoked with the result of each checker.
-func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkCallback CheckCallback, checkers ...HealthChecker) (*health.Health, error) {
+// If provided the checkCallback will be invoked with the result of each checker
+func SetupHealthChecks(
+	componentName, componentVersion string,
+	enableSystemInfo bool,
+	checkCallback CheckCallback,
+	maxRetries int,
+	checkers ...HealthChecker,
+) (*health.Health, error) {
+	retryInterval := 2 * time.Second
+
+	var h *health.Health
+	var err error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		h, err = setupHealthChecks(componentName, componentVersion, enableSystemInfo, checkCallback, checkers...)
+		if err == nil {
+			return h, nil
+		}
+
+		fmt.Printf("Attempt %d/%d: Failed to set up health checks: %v", attempt+1, maxRetries+1, err)
+		if attempt < maxRetries {
+			fmt.Printf("Retrying in %v...", retryInterval)
+			time.Sleep(retryInterval)
+		}
+	}
+
+	return nil, fmt.Errorf("failed to set up health checks after %d attempts: %w", maxRetries+1, err)
+}
+
+func setupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkCallback CheckCallback, checkers ...HealthChecker) (*health.Health, error) {
 	h, err := health.New(
 		health.WithComponent(health.Component{
 			Name:    componentName,

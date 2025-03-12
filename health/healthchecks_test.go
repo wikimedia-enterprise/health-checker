@@ -37,7 +37,7 @@ func TestSetupHealthChecks_Success(t *testing.T) {
 	mockChecker.On("Check", mock.Anything).Return(nil)
 	mockChecker.On("Name").Return("mock-check")
 
-	h, err := SetupHealthChecks("test-service", "v1.0.0", false, nil, mockChecker)
+	h, err := SetupHealthChecks("test-service", "v1.0.0", false, nil, 1, mockChecker)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, h)
@@ -100,7 +100,7 @@ func TestCallback(t *testing.T) {
 	cb := func(n string, t string, res error) {
 		result = res
 	}
-	h, err := SetupHealthChecks("test-service", "v1.0.0", false, cb, mockChecker)
+	h, err := SetupHealthChecks("test-service", "v1.0.0", false, cb, 1, mockChecker)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, h)
