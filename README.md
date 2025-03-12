@@ -40,7 +40,7 @@ func main() {
 		ExpectedStatus: http.StatusOK,
 	})
 
-	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, httpChecker)
+	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, nil, 1, httpChecker)
 	if err != nil {
 		log.Fatalf("Failed to setup health checks: %v", err)
 	}
@@ -86,7 +86,7 @@ func main() {
 		log.Fatalf("Failed to create S3 checker: %v", err)
 	}
 
-	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, s3Checker)
+	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, nil, 1, s3Checker)
 	if err != nil {
 		log.Fatalf("Failed to setup health checks: %v", err)
 	}
@@ -112,18 +112,23 @@ import (
 )
 
 func main() {
-	kafkaChecker := health.NewAsyncKafkaChecker(health.NewSyncKafkaChecker(health.SyncKafkaChecker{
+	sync, err := health.NewSyncKafkaChecker(health.SyncKafkaChecker{
 		Name:           "kafka-health-check",
 		Interval:       10 * time.Second,
 		Producer:       nil, // Provide a valid producer client
 		Consumer:       nil, // Provide a valid consumer client
-		RequiredTopics: []string{"test-topic"},
+		ConsumerTopics: []string{"test-topic-1"},
+		ProducerTopics: []string{"test-topic-2"},
 		MaxLag:         1000,
-	}, health.NewConsumerOffsetStore()))
-
-	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, kafkaChecker)
+	}, health.NewConsumerOffsetStore())
 	if err != nil {
-		log.Fatalf("Failed to setup health checks: %v", err)
+		log.Fatalf("Failed to set up Kafka sync checks: %v", err)
+	}
+	kafkaChecker := health.NewAsyncKafkaChecker(sync)
+
+	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, nil, 1, kafkaChecker)
+	if err != nil {
+		log.Fatalf("Failed to set up health checks: %v", err)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -166,11 +171,21 @@ func main() {
 		BucketName: "my-bucket", Name: "s3-bucket-check", S3Client: s3Client,
 	})
 
-	kafkaChecker := health.NewAsyncKafkaChecker(health.NewSyncKafkaChecker(health.SyncKafkaChecker{
-		Name: "kafka-health-check", Interval: 10 * time.Second, RequiredTopics: []string{"test-topic"},
-	}, health.NewConsumerOffsetStore()))
+	sync, err := health.NewSyncKafkaChecker(health.SyncKafkaChecker{
+		Name:           "kafka-health-check",
+		Interval:       10 * time.Second,
+		Producer:       nil, // Provide a valid producer client
+		Consumer:       nil, // Provide a valid consumer client
+		ConsumerTopics: []string{"test-topic-1"},
+		ProducerTopics: []string{"test-topic-2"},
+		MaxLag:         1000,
+	}, health.NewConsumerOffsetStore())
+	if err != nil {
+		log.Fatalf("Failed to set up Kafka sync checks: %v", err)
+	}
+	kafkaChecker := health.NewAsyncKafkaChecker(sync)
 
-	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, httpChecker, s3Checker, kafkaChecker)
+	h, err := health.SetupHealthChecks("MyService", "1.0.0", true, nil, 1, httpChecker, s3Checker, kafkaChecker)
 	if err != nil {
 		log.Fatalf("Failed to setup health checks: %v", err)
 	}
