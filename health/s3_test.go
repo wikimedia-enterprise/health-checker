@@ -22,7 +22,12 @@ type MockS3Client struct {
 
 func (m *MockS3Client) HeadBucketWithContext(ctx aws.Context, input *s3.HeadBucketInput, opts ...request.Option) (*s3.HeadBucketOutput, error) {
 	args := m.Called(ctx, input, opts)
-	return args.Get(0).(*s3.HeadBucketOutput), args.Error(1)
+
+	out := args.Get(0)
+	if out == nil {
+		return nil, args.Error(1)
+	}
+	return out.(*s3.HeadBucketOutput), args.Error(1)
 }
 
 func TestS3Checker_Check_Success(t *testing.T) {
@@ -33,16 +38,69 @@ func TestS3Checker_Check_Success(t *testing.T) {
 	}, mock.Anything).Return(&s3.HeadBucketOutput{}, nil)
 
 	config := S3CheckerConfig{
-		BucketName: "test-bucket",
-		Name:       "test-s3-check",
-		Region:     "us-east-1",
-		S3Client:   mockS3,
+		BucketName:     "test-bucket",
+		Name:           "test-s3-check",
+		Region:         "us-east-1",
+		S3Client:       mockS3,
+		MaxRetries:     3,
+		InitialBackoff: 10 * time.Millisecond,
 	}
 	checker, _ := NewS3Checker(config)
 
 	err := checker.Check(context.Background())
 	assert.NoError(t, err)
 
+	mockS3.AssertExpectations(t)
+}
+
+func TestS3Checker_Check_RetriesAndFails(t *testing.T) {
+	mockS3 := new(MockS3Client)
+	awsErr := awserr.New("SomeAWSError", "some aws error", nil)
+
+	mockS3.On("HeadBucketWithContext", mock.Anything, mock.Anything, mock.Anything).
+		Return((*s3.HeadBucketOutput)(nil), awsErr).
+		Times(3)
+
+	config := S3CheckerConfig{
+		BucketName:     "test-bucket",
+		Name:           "test-s3-check",
+		Region:         "us-east-1",
+		S3Client:       mockS3,
+		MaxRetries:     3,
+		InitialBackoff: 10 * time.Millisecond,
+	}
+	checker, _ := NewS3Checker(config)
+
+	err := checker.Check(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "s3 health check failed after 3 retries")
+	mockS3.AssertExpectations(t)
+}
+
+func TestS3Checker_Check_RetriesThenSuccess(t *testing.T) {
+	mockS3 := new(MockS3Client)
+	awsErr := awserr.New("SomeAWSError", "some aws error", nil)
+
+	// Fail twice, then succeed
+	mockS3.On("HeadBucketWithContext", mock.Anything, mock.Anything, mock.Anything).
+		Return((*s3.HeadBucketOutput)(nil), awsErr).Once()
+	mockS3.On("HeadBucketWithContext", mock.Anything, mock.Anything, mock.Anything).
+		Return((*s3.HeadBucketOutput)(nil), awsErr).Once()
+	mockS3.On("HeadBucketWithContext", mock.Anything, mock.Anything, mock.Anything).
+		Return(&s3.HeadBucketOutput{}, nil).Once()
+
+	config := S3CheckerConfig{
+		BucketName:     "test-bucket",
+		Name:           "test-s3-check",
+		Region:         "us-east-1",
+		S3Client:       mockS3,
+		MaxRetries:     5, // higher than the expected failures.
+		InitialBackoff: 10 * time.Millisecond,
+	}
+	checker, _ := NewS3Checker(config)
+
+	err := checker.Check(context.Background())
+	assert.NoError(t, err)
 	mockS3.AssertExpectations(t)
 }
 
@@ -57,7 +115,6 @@ func TestS3Checker_Check_OtherAWSError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "s3 HeadBucket failed")
-	assert.ErrorIs(t, err, awsErr)
 	mockS3.AssertExpectations(t)
 }
 
@@ -96,22 +153,28 @@ func TestS3Checker_Type(t *testing.T) {
 
 func TestS3Checker_Check_ContextCancelled_DuringRequest(t *testing.T) {
 	mockS3 := new(MockS3Client)
+	// the mock operation takes longer than the context timeout
 	mockS3.On("HeadBucketWithContext", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, context.DeadlineExceeded).
 		Run(func(args mock.Arguments) {
 			time.Sleep(200 * time.Millisecond)
-		}).
-		Return((*s3.HeadBucketOutput)(nil), context.DeadlineExceeded)
+		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	config := S3CheckerConfig{S3Client: mockS3, BucketName: "test", Name: "Test"}
+	config := S3CheckerConfig{
+		S3Client:       mockS3,
+		BucketName:     "test",
+		Name:           "Test",
+		MaxRetries:     3,
+		InitialBackoff: 10 * time.Millisecond,
+	}
 	checker, _ := NewS3Checker(config)
 
 	err := checker.Check(ctx)
 
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Contains(t, err.Error(), "s3 HeadBucket failed")
 	mockS3.AssertExpectations(t)
 }

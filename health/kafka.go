@@ -40,13 +40,33 @@ type KafkaChecker struct {
 	wg       sync.WaitGroup
 }
 
+type AsyncKafkaCheckerConfig struct {
+	MaxRetries     int
+	InitialBackoff time.Duration
+}
+
+// DefaultAsyncKafkaCheckerConfig provides default values for the asynchronous checker.
+var DefaultAsyncKafkaCheckerConfig = AsyncKafkaCheckerConfig{
+	MaxRetries:     5,
+	InitialBackoff: 1 * time.Second,
+}
+
 // RegisterKafkaHealthChecks registers Kafka health checks with the health package.
-func RegisterKafkaHealthChecks(h *health.Health, configs []SyncKafkaChecker, isAsync bool) error {
+func RegisterKafkaHealthChecks(h *health.Health, configs []SyncKafkaChecker, isAsync bool, asyncConfig ...AsyncKafkaCheckerConfig) error {
+	// Use default config if none provided, otherwise use the first one.
+	var config AsyncKafkaCheckerConfig
+	if len(asyncConfig) > 0 {
+		config = asyncConfig[0]
+	} else {
+		config = DefaultAsyncKafkaCheckerConfig
+	}
+
 	for _, conf := range configs {
 		var checker HealthChecker
 		syncChecker := NewSyncKafkaChecker(conf, NewConsumerOffsetStore())
 		if isAsync {
-			checker = NewAsyncKafkaChecker(syncChecker)
+			// Pass maxRetries and initialBackoff here!
+			checker = NewAsyncKafkaChecker(syncChecker, config.MaxRetries, config.InitialBackoff)
 		} else {
 			checker = syncChecker
 		}
@@ -181,29 +201,55 @@ func evaluateOffsets(store *ConsumerOffsetStore, assignment kafka.TopicPartition
 
 // AsyncKafkaChecker is an asynchronous health checker for Kafka.
 type AsyncKafkaChecker struct {
-	checker *KafkaChecker
-	store   *AsyncHealthStore
+	checker        *KafkaChecker
+	store          *AsyncHealthStore
+	maxRetries     int
+	initialBackoff time.Duration
 }
 
 // NewAsyncKafkaChecker creates a new AsyncKafkaChecker.
-func NewAsyncKafkaChecker(checker *KafkaChecker) *AsyncKafkaChecker {
+func NewAsyncKafkaChecker(checker *KafkaChecker, maxRetries int, initialBackoff time.Duration) *AsyncKafkaChecker {
 	return &AsyncKafkaChecker{
-		checker: checker,
-		store:   NewAsyncHealthStore(),
+		checker:        checker,
+		store:          NewAsyncHealthStore(),
+		maxRetries:     maxRetries,
+		initialBackoff: initialBackoff,
 	}
 }
 
 // Start begins the asynchronous Kafka health check loop.
 func (akc *AsyncKafkaChecker) Start(ctx context.Context) {
+	var startupErr error
+	for i := 0; i < akc.maxRetries; i++ {
+		if i > 0 {
+			backoff := akc.initialBackoff * time.Duration(1<<uint(i-1))
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				akc.store.UpdateStatus(akc.checker.Name(), ctx.Err())
+				return
+			}
+		}
+
+		startupErr = akc.checker.Check(ctx)
+		if startupErr == nil {
+			break
+		}
+		if ctx.Err() != nil {
+			akc.store.UpdateStatus(akc.checker.Name(), ctx.Err())
+			return
+		}
+	}
+	akc.store.UpdateStatus(akc.checker.Name(), startupErr)
+
 	go func() {
 		for {
-			err := akc.checker.Check(ctx)
-			akc.store.UpdateStatus(akc.checker.Name(), err)
-
 			select {
 			case <-ctx.Done():
 				return
 			case <-time.After(akc.checker.checker.Interval):
+				err := akc.checker.Check(ctx)
+				akc.store.UpdateStatus(akc.checker.Name(), err)
 			}
 		}
 	}()
@@ -225,8 +271,8 @@ func (akc *AsyncKafkaChecker) Type() string {
 }
 
 // SetupKafkaCheckers creates an AsyncKafkaChecker
-func SetUpKafkaCheckers(ctx context.Context, requiredTopics []string, producer *kafka.Producer, intervalMS int, lag int,
-	consumer *kafka.Consumer) *AsyncKafkaChecker {
+func SetUpKafkaCheckers(ctx context.Context, requiredTopics []string, producer ProducerClient, intervalMS int, lag int,
+	consumer ConsumerClient) *AsyncKafkaChecker {
 	kafka := NewAsyncKafkaChecker(NewSyncKafkaChecker(SyncKafkaChecker{
 		Name:           "kafka-health-check",
 		Interval:       time.Duration(intervalMS) * time.Millisecond,
@@ -234,7 +280,7 @@ func SetUpKafkaCheckers(ctx context.Context, requiredTopics []string, producer *
 		Consumer:       consumer,
 		RequiredTopics: requiredTopics,
 		MaxLag:         int64(lag),
-	}, NewConsumerOffsetStore()))
+	}, NewConsumerOffsetStore()), 5, 1*time.Second)
 
 	return kafka
 }

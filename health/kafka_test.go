@@ -134,7 +134,7 @@ type AsyncKafkaCheckerTestSuite struct {
 }
 
 func (suite *AsyncKafkaCheckerTestSuite) SetupTest() {
-	suite.checker = NewAsyncKafkaChecker(&KafkaChecker{})
+	suite.checker = NewAsyncKafkaChecker(&KafkaChecker{}, 5, time.Second)
 }
 
 func (suite *AsyncKafkaCheckerTestSuite) TestAsyncKafkaCheckerStart() {
@@ -154,45 +154,20 @@ func TestAsyncKafkaCheckerTestSuite(t *testing.T) {
 	suite.Run(t, new(AsyncKafkaCheckerTestSuite))
 }
 
+// KafkaCheckerSetupTestSuite tests SetUpKafkaCheckers function
 type KafkaCheckerSetupTestSuite struct {
 	suite.Suite
-	producer       *kafka.Producer
-	consumer       *kafka.Consumer
+	mockProducer   *MockProducer
+	mockConsumer   *MockConsumer
 	requiredTopics []string
 }
 
-func (s *KafkaCheckerSetupTestSuite) SetupSuite() {
-	producerConfig := &kafka.ConfigMap{
-		"bootstrap.servers": getKafkaBootstrapServers(),
-	}
-	var err error
+func (s *KafkaCheckerSetupTestSuite) SetupTest() {
 
-	s.producer, err = kafka.NewProducer(producerConfig)
-	s.Require().NoError(err, "Failed to create Kafka producer")
-
-	consumerConfig := &kafka.ConfigMap{
-		"bootstrap.servers":        getKafkaBootstrapServers(),
-		"group.id":                 "kafka-checker-setup-test-group",
-		"auto.offset.reset":        "earliest",
-		"go.events.channel.enable": true,
-	}
-
-	s.consumer, err = kafka.NewConsumer(consumerConfig)
-	s.Require().NoError(err, "Failed to create Kafka consumer")
-
+	s.mockProducer = new(MockProducer)
+	s.mockConsumer = new(MockConsumer)
 	s.requiredTopics = []string{"test-topic-1", "test-topic-2"}
-	err = s.consumer.SubscribeTopics(s.requiredTopics, nil)
-	s.Require().NoError(err, "Failed to subscribe to topics")
 
-}
-
-func (s *KafkaCheckerSetupTestSuite) TearDownSuite() {
-	if s.producer != nil {
-		s.producer.Close()
-	}
-	if s.consumer != nil {
-		s.consumer.Close()
-	}
 }
 
 func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
@@ -200,7 +175,17 @@ func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
 	intervalMS := 2000
 	lag := 5
 
-	checker := SetUpKafkaCheckers(ctx, s.requiredTopics, s.producer, intervalMS, lag, s.consumer)
+	// Set up expectations for the mocks.  These are minimal expectations
+	// for the startup check.  More comprehensive testing of the check
+	// logic is done in the KafkaCheckerTestSuite.
+	mockMetadata := &kafka.Metadata{Topics: map[string]kafka.TopicMetadata{"test-topic-1": {}, "test-topic-2": {}}}
+	s.mockProducer.On("GetMetadata", (*string)(nil), true, 5000).Return(mockMetadata, nil)
+	mockAssignments := []kafka.TopicPartition{{Topic: &s.requiredTopics[0], Partition: 0}}
+	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
+	s.mockConsumer.On("Position", mock.Anything).Return(mockAssignments, nil)
+	s.mockConsumer.On("Committed", mock.Anything, 5000).Return(mockAssignments, nil)
+
+	checker := SetUpKafkaCheckers(ctx, s.requiredTopics, s.mockProducer, intervalMS, lag, s.mockConsumer)
 
 	s.Require().NotNil(checker, "SetUpKafkaCheckers returned nil")
 	s.Equal("kafka-health-check", checker.Name())
@@ -211,27 +196,26 @@ func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
 	s.Require().NotNil(checker.checker.checker.Producer)
 	s.Require().NotNil(checker.checker.checker.Consumer)
 
-	producer, ok := checker.checker.checker.Producer.(*kafka.Producer)
+	// Verify that the checker's producer and consumer are our mocks.
+	producer, ok := checker.checker.checker.Producer.(*MockProducer)
 	s.True(ok)
-	s.Equal(s.producer, producer)
+	s.Equal(s.mockProducer, producer)
 
-	consumer, ok := checker.checker.checker.Consumer.(*kafka.Consumer)
+	consumer, ok := checker.checker.checker.Consumer.(*MockConsumer)
 	s.True(ok)
-	s.Equal(s.consumer, consumer)
+	s.Equal(s.mockConsumer, consumer)
 
 	checker.Start(ctx)
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond) // Allow Start to run
 
-	err := checker.Check(ctx)
+	err := checker.Check(ctx) // Check after startup
 	s.NoError(err)
+
+	s.mockProducer.AssertExpectations(s.T())
+	s.mockConsumer.AssertExpectations(s.T())
 
 }
 
 func TestKafkaCheckerSetupTestSuite(t *testing.T) {
 	suite.Run(t, new(KafkaCheckerSetupTestSuite))
-}
-
-func getKafkaBootstrapServers() string {
-	servers := "localhost:9092"
-	return servers
 }

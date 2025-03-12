@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -12,10 +13,12 @@ import (
 
 // S3CheckerConfig holds configuration for the S3Checker.
 type S3CheckerConfig struct {
-	BucketName string
-	Name       string
-	Region     string
-	S3Client   s3iface.S3API
+	BucketName     string
+	Name           string
+	Region         string
+	S3Client       s3iface.S3API
+	MaxRetries     int           // Maximum number of retries
+	InitialBackoff time.Duration // Initial backoff duration
 }
 
 // S3Checker implements the HealthChecker interface for AWS S3.
@@ -33,11 +36,47 @@ func NewS3Checker(config S3CheckerConfig) (*S3Checker, error) {
 		return nil, fmt.Errorf("failed to create AWS session: %w", fmt.Errorf("no S3 interface detected"))
 	}
 
+	// Set default values if not provided
+	if config.MaxRetries == 0 {
+		config.MaxRetries = 5
+	}
+	if config.InitialBackoff == 0 {
+		config.InitialBackoff = 1 * time.Second
+	}
+
 	return &S3Checker{config: config, s3Client: client}, nil
 }
 
-// Check performs the S3 health check.
+// Check performs the S3 health check with retries.
 func (c *S3Checker) Check(ctx context.Context) error {
+	return c.checkWithRetries(ctx)
+}
+
+func (c *S3Checker) checkWithRetries(ctx context.Context) error {
+	var err error
+	for i := 0; i < c.config.MaxRetries; i++ {
+		if i > 0 {
+			backoff := c.config.InitialBackoff * time.Duration(1<<uint(i-1))
+			select {
+			case <-time.After(backoff):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		err = c.doCheck(ctx)
+		if err == nil {
+			return nil
+		}
+
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+	}
+	return fmt.Errorf("s3 health check failed after %d retries: %w", c.config.MaxRetries, err)
+}
+
+func (c *S3Checker) doCheck(ctx context.Context) error {
 	_, err := c.s3Client.HeadBucketWithContext(ctx, &s3.HeadBucketInput{
 		Bucket: aws.String(c.config.BucketName),
 	})
