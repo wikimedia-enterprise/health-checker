@@ -65,7 +65,6 @@ func RegisterKafkaHealthChecks(h *health.Health, configs []SyncKafkaChecker, isA
 		var checker HealthChecker
 		syncChecker := NewSyncKafkaChecker(conf, NewConsumerOffsetStore())
 		if isAsync {
-			// Pass maxRetries and initialBackoff here!
 			checker = NewAsyncKafkaChecker(syncChecker, config.MaxRetries, config.InitialBackoff)
 		} else {
 			checker = syncChecker

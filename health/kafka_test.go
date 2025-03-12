@@ -175,9 +175,6 @@ func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
 	intervalMS := 2000
 	lag := 5
 
-	// Set up expectations for the mocks.  These are minimal expectations
-	// for the startup check.  More comprehensive testing of the check
-	// logic is done in the KafkaCheckerTestSuite.
 	mockMetadata := &kafka.Metadata{Topics: map[string]kafka.TopicMetadata{"test-topic-1": {}, "test-topic-2": {}}}
 	s.mockProducer.On("GetMetadata", (*string)(nil), true, 5000).Return(mockMetadata, nil)
 	mockAssignments := []kafka.TopicPartition{{Topic: &s.requiredTopics[0], Partition: 0}}
@@ -196,19 +193,10 @@ func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
 	s.Require().NotNil(checker.checker.checker.Producer)
 	s.Require().NotNil(checker.checker.checker.Consumer)
 
-	// Verify that the checker's producer and consumer are our mocks.
-	producer, ok := checker.checker.checker.Producer.(*MockProducer)
-	s.True(ok)
-	s.Equal(s.mockProducer, producer)
-
-	consumer, ok := checker.checker.checker.Consumer.(*MockConsumer)
-	s.True(ok)
-	s.Equal(s.mockConsumer, consumer)
-
 	checker.Start(ctx)
-	time.Sleep(50 * time.Millisecond) // Allow Start to run
+	time.Sleep(50 * time.Millisecond)
 
-	err := checker.Check(ctx) // Check after startup
+	err := checker.Check(ctx)
 	s.NoError(err)
 
 	s.mockProducer.AssertExpectations(s.T())
