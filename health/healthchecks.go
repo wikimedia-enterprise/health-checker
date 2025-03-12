@@ -88,15 +88,13 @@ func wrapCheckerForCallback(cb CheckCallback, checker HealthChecker) HealthCheck
 	return HealthCheckerWrapper{HealthChecker: checker, callback: cb}
 }
 
-// SetupHealthChecks sets up and registers health checks, returning the health.Health instance.
+// SetupHealthChecks sets up and registers health checks with retries, returning the health.Health instance.
 //
-// checkCallback, if provided, will be invoked with the result of each checker.
-// SetupHealthChecks sets up and registers health checks, *with retries*.
-// SetupHealthChecks sets up and registers health checks, with retries and a callback.
+// If provided the checkCallback will be invoked with the result of each checker
 func SetupHealthChecks(
 	componentName, componentVersion string,
 	enableSystemInfo bool,
-	checkCallback CheckCallback, // Add the callback parameter
+	checkCallback CheckCallback,
 	checkers ...HealthChecker,
 ) (*health.Health, error) {
 	maxRetries := 3
