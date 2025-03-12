@@ -83,7 +83,7 @@ func main() {
 		}
 	}
 
-	h, err := healthchecks.SetupHealthChecks("MyService", "1.0.0", true, loggerCallback, httpChecker1, httpChecker2, s3Checker)
+	h, err := healthchecks.SetupHealthChecks("MyService", "1.0.0", true, loggerCallback, 1, httpChecker1, httpChecker2, s3Checker)
 	if err != nil {
 		log.Fatalf("Failed to setup health checks: %v", err)
 	}
