@@ -108,7 +108,7 @@ func SetupHealthChecks(
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		h, err = setupHealthChecks(componentName, componentVersion, enableSystemInfo, checkCallback, checkers...)
 		if err == nil {
-			return h, nil // Success!
+			return h, nil
 		}
 
 		fmt.Printf("Attempt %d/%d: Failed to set up health checks: %v", attempt+1, maxRetries+1, err)
@@ -140,7 +140,6 @@ func setupHealthChecks(componentName, componentVersion string, enableSystemInfo 
 	}
 
 	for _, checker := range checkers {
-		// Wrap the checker with the callback logic.
 		checker = wrapCheckerForCallback(checkCallback, checker)
 		checkConfig := health.Config{
 			Name:    checker.Name(),
