@@ -301,7 +301,8 @@ type KafkaCheckerSetupTestSuite struct {
 	suite.Suite
 	producer       *kafka.Producer
 	consumer       *kafka.Consumer
-	requiredTopics []string
+	consumerTopics []string
+	producerTopics []string
 }
 
 func (s *KafkaCheckerSetupTestSuite) SetupSuite() {
@@ -310,6 +311,7 @@ func (s *KafkaCheckerSetupTestSuite) SetupSuite() {
 	}
 	var err error
 
+	s.producerTopics = []string{"producer-topic"}
 	s.producer, err = kafka.NewProducer(producerConfig)
 	s.Require().NoError(err, "Failed to create Kafka producer")
 
@@ -323,8 +325,8 @@ func (s *KafkaCheckerSetupTestSuite) SetupSuite() {
 	s.consumer, err = kafka.NewConsumer(consumerConfig)
 	s.Require().NoError(err, "Failed to create Kafka consumer")
 
-	s.requiredTopics = []string{"test-topic-1", "test-topic-2"}
-	err = s.consumer.SubscribeTopics(s.requiredTopics, nil)
+	s.consumerTopics = []string{"test-topic-1", "test-topic-2"}
+	err = s.consumer.SubscribeTopics(s.consumerTopics, nil)
 	s.Require().NoError(err, "Failed to subscribe to topics")
 
 }
@@ -340,32 +342,33 @@ func (s *KafkaCheckerSetupTestSuite) TearDownSuite() {
 
 func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
 	ctx := context.Background()
-	intervalMS := 2000
+	intervalMs := 2000
 	lag := 5
 
-	checker := SetUpKafkaCheckers(ctx, s.requiredTopics, s.producer, intervalMS, lag, s.consumer)
+	async, err := SetUpKafkaCheckers(ctx, s.producerTopics, s.producer, intervalMs, lag, s.consumerTopics, s.consumer, false)
+	s.Nil(err)
 
-	s.Require().NotNil(checker, "SetUpKafkaCheckers returned nil")
-	s.Equal("kafka-health-check", checker.Name())
-	s.Equal("kafka-async", checker.Type())
-	s.Equal(time.Duration(intervalMS)*time.Millisecond, checker.checker.checker.Interval)
-	s.Equal(int64(lag), checker.checker.checker.MaxLag)
-	s.Equal(s.requiredTopics, checker.checker.checker.RequiredTopics)
-	s.Require().NotNil(checker.checker.checker.Producer)
-	s.Require().NotNil(checker.checker.checker.Consumer)
+	s.Require().NotNil(async, "SetUpKafkaCheckers returned nil")
+	s.Equal("kafka-health-check", async.Name())
+	s.Equal("kafka-async", async.Type())
+	s.Equal(time.Duration(intervalMs)*time.Millisecond, async.checker.checker.Interval)
+	s.Equal(int64(lag), async.checker.checker.MaxLag)
+	s.Equal(s.producerTopics, async.checker.checker.ProducerTopics)
+	s.Require().NotNil(async.checker.checker.Producer)
+	s.Require().NotNil(async.checker.checker.Consumer)
 
-	producer, ok := checker.checker.checker.Producer.(*kafka.Producer)
+	producer, ok := async.checker.checker.Producer.(*kafka.Producer)
 	s.True(ok)
 	s.Equal(s.producer, producer)
 
-	consumer, ok := checker.checker.checker.Consumer.(*kafka.Consumer)
+	consumer, ok := async.checker.checker.Consumer.(*kafka.Consumer)
 	s.True(ok)
 	s.Equal(s.consumer, consumer)
 
-	checker.Start(ctx)
+	async.Start(ctx)
 	time.Sleep(50 * time.Millisecond)
 
-	err := checker.Check(ctx)
+	err = async.Check(ctx)
 	s.NoError(err)
 
 }

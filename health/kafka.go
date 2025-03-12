@@ -272,16 +272,21 @@ func (akc *AsyncKafkaChecker) Type() string {
 }
 
 // SetupKafkaCheckers creates an AsyncKafkaChecker
-func SetUpKafkaCheckers(ctx context.Context, requiredTopics []string, producer *kafka.Producer, intervalMS int, lag int,
-	consumer *kafka.Consumer) *AsyncKafkaChecker {
-	kafka := NewAsyncKafkaChecker(NewSyncKafkaChecker(SyncKafkaChecker{
-		Name:           "kafka-health-check",
-		Interval:       time.Duration(intervalMS) * time.Millisecond,
-		Producer:       producer,
-		Consumer:       consumer,
-		RequiredTopics: requiredTopics,
-		MaxLag:         int64(lag),
-	}, NewConsumerOffsetStore()))
+func SetUpKafkaCheckers(ctx context.Context, producerTopics []string, producer *kafka.Producer, intervalMs int, lag int,
+	consumerTopics []string, consumer *kafka.Consumer, consumerIgnoreOffsets bool) (*AsyncKafkaChecker, error) {
+	sync, err := NewSyncKafkaChecker(SyncKafkaChecker{
+		Name:                  "kafka-health-check",
+		Interval:              time.Duration(intervalMs) * time.Millisecond,
+		Producer:              producer,
+		Consumer:              consumer,
+		ProducerTopics:        producerTopics,
+		ConsumerTopics:        consumerTopics,
+		MaxLag:                int64(lag),
+		ConsumerIgnoreOffsets: consumerIgnoreOffsets,
+	}, NewConsumerOffsetStore())
+	if err != nil {
+		return nil, err
+	}
 
-	return kafka
+	return NewAsyncKafkaChecker(sync), nil
 }
