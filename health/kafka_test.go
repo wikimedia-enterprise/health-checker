@@ -3,6 +3,7 @@ package health
 import (
 	"context"
 	"errors"
+	"log"
 	"testing"
 	"time"
 
@@ -47,6 +48,7 @@ type KafkaCheckerTestSuite struct {
 	suite.Suite
 	mockProducer *MockProducer
 	mockConsumer *MockConsumer
+	cfg          SyncKafkaChecker
 	checker      *KafkaChecker
 }
 
@@ -54,16 +56,96 @@ func (s *KafkaCheckerTestSuite) SetupTest() {
 	s.mockProducer = new(MockProducer)
 	s.mockConsumer = new(MockConsumer)
 
-	cfg := SyncKafkaChecker{
+	s.cfg = SyncKafkaChecker{
 		Name:           "test-kafka",
 		Interval:       60 * time.Second,
 		Producer:       s.mockProducer,
 		Consumer:       s.mockConsumer,
-		RequiredTopics: []string{"topic1"},
+		ConsumerTopics: []string{"consumed-topic"},
+		ProducerTopics: []string{"topic1"},
 		MaxLag:         10,
 	}
 
-	s.checker = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	var err error
+	s.checker, err = NewSyncKafkaChecker(s.cfg, NewConsumerOffsetStore())
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (s *KafkaCheckerTestSuite) TestKafkaChecker_SettingsValidation() {
+	cfg := SyncKafkaChecker{
+		Name:                  "test-kafka",
+		Interval:              60 * time.Second,
+		Producer:              s.mockProducer,
+		Consumer:              s.mockConsumer,
+		ProducerTopics:        []string{"topic1"},
+		ConsumerTopics:        []string{"consumed-topic"},
+		MaxLag:                10,
+		ConsumerIgnoreOffsets: true,
+	}
+	_, err := NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.Error(err)
+	s.Contains(err.Error(), "incompatible kafka checker consumer settings")
+
+	cfg = SyncKafkaChecker{
+		Name:                  "test-kafka",
+		Interval:              60 * time.Second,
+		Producer:              s.mockProducer,
+		Consumer:              s.mockConsumer,
+		ProducerTopics:        []string{"topic1"},
+		ConsumerTopics:        []string{"consumed-topic"},
+		ConsumerIgnoreOffsets: false,
+	}
+	_, err = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.Error(err)
+	s.Contains(err.Error(), "incompatible kafka checker consumer settings")
+
+	cfg = SyncKafkaChecker{
+		Name:           "test-kafka",
+		Interval:       60 * time.Second,
+		Producer:       s.mockProducer,
+		Consumer:       s.mockConsumer,
+		ProducerTopics: []string{"topic1"},
+		ConsumerTopics: []string{},
+		MaxLag:         5,
+	}
+	_, err = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.Error(err)
+	s.Contains(err.Error(), "kafka consumer client without consumer topics to check")
+
+	cfg = SyncKafkaChecker{
+		Name:           "test-kafka",
+		Interval:       60 * time.Second,
+		Producer:       s.mockProducer,
+		Consumer:       nil,
+		ProducerTopics: []string{"topic1"},
+		ConsumerTopics: []string{"consumed-topic"},
+		MaxLag:         5,
+	}
+	_, err = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.Error(err)
+	s.Contains(err.Error(), "consumer settings provided without consumer client")
+
+	cfg = SyncKafkaChecker{
+		Name:           "test-kafka",
+		Interval:       60 * time.Second,
+		Producer:       s.mockProducer,
+		ProducerTopics: []string{},
+	}
+	_, err = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.Error(err)
+	s.Contains(err.Error(), "kafka producer client without producer topics to check")
+
+	cfg = SyncKafkaChecker{
+		Name:           "test-kafka",
+		Interval:       60 * time.Second,
+		Producer:       nil,
+		ProducerTopics: []string{"topic1"},
+	}
+	_, err = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.Error(err)
+	s.Contains(err.Error(), "producer topics to check without a kafka producer client")
 }
 
 func (s *KafkaCheckerTestSuite) TestKafkaChecker_Name() {
@@ -83,7 +165,7 @@ func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_ProducerFailure() {
 func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_Success() {
 	mockMetadata := &kafka.Metadata{Topics: map[string]kafka.TopicMetadata{"topic1": {}}}
 	s.mockProducer.On("GetMetadata", (*string)(nil), true, 5000).Return(mockMetadata, nil)
-	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("topic1"), Partition: 0}}
+	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("consumed-topic"), Partition: 0}}
 	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
 	s.mockConsumer.On("Position", mock.Anything).Return(mockAssignments, nil)
 	s.mockConsumer.On("Committed", mock.Anything, 5000).Return(mockAssignments, nil)
@@ -93,18 +175,79 @@ func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_Success() {
 
 func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_ConsumerStuck() {
 	offsetStore := NewConsumerOffsetStore()
-	offsetStore.SetOffsets("topic1", 0, 100, 100)
-	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("topic1"), Partition: 0}}
-	currentPosition := kafka.TopicPartition{Topic: stringPtr("topic1"), Partition: 0, Offset: 100}
-	committedOffset := kafka.TopicPartition{Topic: stringPtr("topic1"), Partition: 0, Offset: 99}
+	offsetStore.SetOffsets("consumed-topic", 0, 100, 100)
+	var err error
+	s.cfg.Producer = nil
+	s.cfg.ProducerTopics = nil
+	s.checker, err = NewSyncKafkaChecker(s.cfg, offsetStore)
+	s.Nil(err)
+	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("consumed-topic"), Partition: 0}}
+	currentPosition := kafka.TopicPartition{Topic: stringPtr("consumed-topic"), Partition: 0, Offset: 100}
+	committedOffset := kafka.TopicPartition{Topic: stringPtr("consumed-topic"), Partition: 0, Offset: 99}
 
 	s.mockConsumer.On("Position", mockAssignments).Return([]kafka.TopicPartition{currentPosition}, nil)
 	s.mockConsumer.On("Committed", mockAssignments, 5000).Return([]kafka.TopicPartition{committedOffset}, nil)
 	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
 
-	err := checkConsumer(s.mockConsumer, offsetStore)
+	err = s.checker.Check(context.Background())
 	s.Error(err)
 	s.Contains(err.Error(), "consumer appears stuck for partition")
+}
+
+func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_ConsumerStuck_NoOffsetCheck() {
+	offsetStore := NewConsumerOffsetStore()
+	offsetStore.SetOffsets("consumed-topic", 0, 100, 100)
+	var err error
+	s.cfg.Producer = nil
+	s.cfg.ProducerTopics = nil
+	s.cfg.ConsumerIgnoreOffsets = true
+	s.cfg.MaxLag = 0
+	s.checker, err = NewSyncKafkaChecker(s.cfg, offsetStore)
+	s.Nil(err)
+	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("consumed-topic"), Partition: 0}}
+	currentPosition := kafka.TopicPartition{Topic: stringPtr("consumed-topic"), Partition: 0, Offset: 100}
+	committedOffset := kafka.TopicPartition{Topic: stringPtr("consumed-topic"), Partition: 0, Offset: 99}
+
+	s.mockConsumer.On("Position", mockAssignments).Return([]kafka.TopicPartition{currentPosition}, nil)
+	s.mockConsumer.On("Committed", mockAssignments, 5000).Return([]kafka.TopicPartition{committedOffset}, nil)
+	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
+
+	err = s.checker.Check(context.Background())
+	s.Nil(err)
+}
+
+func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_NoAssignmentsForTopic() {
+	offsetStore := NewConsumerOffsetStore()
+	offsetStore.SetOffsets("consumed-topic", 0, 100, 100)
+	var err error
+	s.cfg.Producer = nil
+	s.cfg.ProducerTopics = nil
+	s.checker, err = NewSyncKafkaChecker(s.cfg, offsetStore)
+	s.Nil(err)
+	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("consumed-topic-2"), Partition: 0}}
+	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
+
+	err = s.checker.Check(context.Background())
+	s.Error(err)
+	s.Contains(err.Error(), "no assignments for topic consumed-topic")
+}
+
+func (s *KafkaCheckerTestSuite) TestKafkaChecker_Check_NoAssignmentsForTopic_NoOffsetCheck() {
+	offsetStore := NewConsumerOffsetStore()
+	offsetStore.SetOffsets("consumed-topic", 0, 100, 100)
+	var err error
+	s.cfg.Producer = nil
+	s.cfg.ProducerTopics = nil
+	s.cfg.ConsumerIgnoreOffsets = true
+	s.cfg.MaxLag = 0
+	s.checker, err = NewSyncKafkaChecker(s.cfg, offsetStore)
+	s.Nil(err)
+	mockAssignments := []kafka.TopicPartition{{Topic: stringPtr("consumed-topic-2"), Partition: 0}}
+	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
+
+	err = s.checker.Check(context.Background())
+	s.Error(err)
+	s.Contains(err.Error(), "no assignments for topic consumed-topic")
 }
 
 func (s *KafkaCheckerTestSuite) TestKafkaChecker_Shutdown() {
