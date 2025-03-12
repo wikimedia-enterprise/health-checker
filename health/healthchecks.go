@@ -91,7 +91,38 @@ func wrapCheckerForCallback(cb CheckCallback, checker HealthChecker) HealthCheck
 // SetupHealthChecks sets up and registers health checks, returning the health.Health instance.
 //
 // checkCallback, if provided, will be invoked with the result of each checker.
-func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkCallback CheckCallback, checkers ...HealthChecker) (*health.Health, error) {
+// SetupHealthChecks sets up and registers health checks, *with retries*.
+// SetupHealthChecks sets up and registers health checks, with retries and a callback.
+func SetupHealthChecks(
+	componentName, componentVersion string,
+	enableSystemInfo bool,
+	checkCallback CheckCallback, // Add the callback parameter
+	checkers ...HealthChecker,
+) (*health.Health, error) {
+	maxRetries := 3
+	retryInterval := 2 * time.Second
+
+	var h *health.Health
+	var err error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		h, err = setupHealthChecks(componentName, componentVersion, enableSystemInfo, checkCallback, checkers...)
+		if err == nil {
+			return h, nil // Success!
+		}
+
+		fmt.Printf("Attempt %d/%d: Failed to set up health checks: %v", attempt+1, maxRetries+1, err)
+		if attempt < maxRetries {
+			fmt.Printf("Retrying in %v...", retryInterval)
+			time.Sleep(retryInterval)
+		}
+	}
+
+	return nil, fmt.Errorf("failed to set up health checks after %d attempts: %w", maxRetries+1, err)
+}
+
+// setupHealthChecks is the internal function without retries.
+func setupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkCallback CheckCallback, checkers ...HealthChecker) (*health.Health, error) {
 	h, err := health.New(
 		health.WithComponent(health.Component{
 			Name:    componentName,
@@ -109,6 +140,7 @@ func SetupHealthChecks(componentName, componentVersion string, enableSystemInfo 
 	}
 
 	for _, checker := range checkers {
+		// Wrap the checker with the callback logic.
 		checker = wrapCheckerForCallback(checkCallback, checker)
 		checkConfig := health.Config{
 			Name:    checker.Name(),
