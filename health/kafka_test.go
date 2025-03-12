@@ -302,44 +302,46 @@ type KafkaCheckerSetupTestSuite struct {
 	suite.Suite
 	mockProducer   *MockProducer
 	mockConsumer   *MockConsumer
-	requiredTopics []string
+	consumerTopics []string
+	producerTopics []string
 }
 
 func (s *KafkaCheckerSetupTestSuite) SetupTest() {
 
 	s.mockProducer = new(MockProducer)
 	s.mockConsumer = new(MockConsumer)
-	s.requiredTopics = []string{"test-topic-1", "test-topic-2"}
-
+	s.consumerTopics = []string{"test-topic-3"}
+	s.producerTopics = []string{"test-topic-1", "test-topic-2"}
 }
 
 func (s *KafkaCheckerSetupTestSuite) TestSetUpKafkaCheckers() {
 	ctx := context.Background()
-	intervalMS := 2000
+	intervalMs := 2000
 	lag := 5
 
 	mockMetadata := &kafka.Metadata{Topics: map[string]kafka.TopicMetadata{"test-topic-1": {}, "test-topic-2": {}}}
 	s.mockProducer.On("GetMetadata", (*string)(nil), true, 5000).Return(mockMetadata, nil)
-	mockAssignments := []kafka.TopicPartition{{Topic: &s.requiredTopics[0], Partition: 0}}
+	mockAssignments := []kafka.TopicPartition{{Topic: &s.consumerTopics[0], Partition: 0}}
 	s.mockConsumer.On("Assignment").Return(mockAssignments, nil)
 	s.mockConsumer.On("Position", mock.Anything).Return(mockAssignments, nil)
 	s.mockConsumer.On("Committed", mock.Anything, 5000).Return(mockAssignments, nil)
 
-	checker := SetUpKafkaCheckers(ctx, s.requiredTopics, s.mockProducer, intervalMS, lag, s.mockConsumer)
+	async, err := SetUpKafkaCheckers(ctx, s.producerTopics, s.mockProducer, intervalMs, lag, s.consumerTopics, s.mockConsumer, false)
+	s.Nil(err)
 
-	s.Require().NotNil(checker, "SetUpKafkaCheckers returned nil")
-	s.Equal("kafka-health-check", checker.Name())
-	s.Equal("kafka-async", checker.Type())
-	s.Equal(time.Duration(intervalMS)*time.Millisecond, checker.checker.checker.Interval)
-	s.Equal(int64(lag), checker.checker.checker.MaxLag)
-	s.Equal(s.requiredTopics, checker.checker.checker.RequiredTopics)
-	s.Require().NotNil(checker.checker.checker.Producer)
-	s.Require().NotNil(checker.checker.checker.Consumer)
+	s.Require().NotNil(async, "SetUpKafkaCheckers returned nil")
+	s.Equal("kafka-health-check", async.Name())
+	s.Equal("kafka-async", async.Type())
+	s.Equal(time.Duration(intervalMs)*time.Millisecond, async.checker.checker.Interval)
+	s.Equal(int64(lag), async.checker.checker.MaxLag)
+	s.Equal(s.producerTopics, async.checker.checker.ProducerTopics)
+	s.Require().NotNil(async.checker.checker.Producer)
+	s.Require().NotNil(async.checker.checker.Consumer)
 
-	checker.Start(ctx)
+	async.Start(ctx)
 	time.Sleep(50 * time.Millisecond)
 
-	err := checker.Check(ctx)
+	err = async.Check(ctx)
 	s.NoError(err)
 
 	s.mockProducer.AssertExpectations(s.T())
