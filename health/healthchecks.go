@@ -95,9 +95,9 @@ func SetupHealthChecks(
 	componentName, componentVersion string,
 	enableSystemInfo bool,
 	checkCallback CheckCallback,
+	maxRetries int,
 	checkers ...HealthChecker,
 ) (*health.Health, error) {
-	maxRetries := 3
 	retryInterval := 2 * time.Second
 
 	var h *health.Health
