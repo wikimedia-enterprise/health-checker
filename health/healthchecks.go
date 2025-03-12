@@ -119,7 +119,6 @@ func SetupHealthChecks(
 	return nil, fmt.Errorf("failed to set up health checks after %d attempts: %w", maxRetries+1, err)
 }
 
-// setupHealthChecks is the internal function without retries.
 func setupHealthChecks(componentName, componentVersion string, enableSystemInfo bool, checkCallback CheckCallback, checkers ...HealthChecker) (*health.Health, error) {
 	h, err := health.New(
 		health.WithComponent(health.Component{
