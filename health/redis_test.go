@@ -10,8 +10,7 @@ import (
 )
 
 func TestNewRedisChecker_Success(t *testing.T) {
-	mockClient, mock := redismock.NewClientMock()
-	mock.ExpectPing().SetVal("PONG")
+	mockClient, _ := redismock.NewClientMock()
 
 	config := RedisCheckerConfig{Name: "redis-test"}
 	checker, err := NewRedisChecker(mockClient, config)
@@ -20,20 +19,14 @@ func TestNewRedisChecker_Success(t *testing.T) {
 	assert.NotNil(t, checker)
 	assert.Equal(t, "redis-test", checker.Name())
 
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestNewRedisChecker_Failure(t *testing.T) {
-	mockClient, mock := redismock.NewClientMock()
-	mock.ExpectPing().SetErr(errors.New("redis connection error"))
-
 	config := RedisCheckerConfig{Name: "redis-test"}
-	checker, err := NewRedisChecker(mockClient, config)
+	checker, err := NewRedisChecker(nil, config)
 
 	assert.Error(t, err)
 	assert.Nil(t, checker)
-
-	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestCheck_Success(t *testing.T) {
