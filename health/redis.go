@@ -20,9 +20,8 @@ type RedisChecker struct {
 
 // NewRedisChecker creates a new RedisChecker using an existing redis.Cmdable client.
 func NewRedisChecker(client redis.Cmdable, config RedisCheckerConfig) (*RedisChecker, error) {
-	// Test the connection to ensure the client is valid
-	if _, err := client.Ping(context.Background()).Result(); err != nil {
-		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+	if client == nil {
+		return nil, fmt.Errorf("failed to create redis client: %w", fmt.Errorf("no redis interface detected"))
 	}
 
 	return &RedisChecker{
