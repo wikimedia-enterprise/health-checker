@@ -22,7 +22,7 @@ type RedisChecker struct {
 func NewRedisChecker(client redis.Cmdable, config RedisCheckerConfig) (*RedisChecker, error) {
 	// Test the connection to ensure the client is valid
 	if client == nil {
-		return nil, fmt.Errorf("failed to redis client: %w", fmt.Errorf("no redis interface detected"))
+		return nil, fmt.Errorf("failed to create redis client: %w", fmt.Errorf("no redis interface detected"))
 	}
 
 	return &RedisChecker{
