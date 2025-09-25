@@ -30,7 +30,7 @@ func TestSchemaRegistryChecker_Check_Success(t *testing.T) {
 
 	checker := &SchemaRegistryChecker{
 		CheckerName: "schema-registry",
-		URL:         "http://fake-schema-registry",
+		URL:         "http://schema-registry",
 		HTTPClient:  client,
 	}
 
