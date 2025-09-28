@@ -8,14 +8,14 @@ import (
 	"time"
 )
 
-// SchemaRegistryChecker verifies the availability of a Schema Registry.
+// SchemaRegistryChecker verifies that our service can connect to a Schema Registry instance.
 type SchemaRegistryChecker struct {
 	CheckerName string
 	URL         string
 	HTTPClient  HttpClient
 }
 
-// Check verifies Schema Registry is healthy by querying /subjects.
+// Check verifies Schema Registry is configured to query schema registry
 func (c *SchemaRegistryChecker) Check(ctx context.Context) error {
 	client := c.HTTPClient
 	if client == nil {
@@ -24,18 +24,18 @@ func (c *SchemaRegistryChecker) Check(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/subjects", c.URL), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("error creating request: %w", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to reach schema registry: %w", err)
+		return fmt.Errorf("error /subjects not reachable: %w", err)
 	}
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("schema registry unhealthy: status %d", resp.StatusCode)
+		return fmt.Errorf("error unable to query /subjects: status %d", resp.StatusCode)
 	}
 
 	return nil
