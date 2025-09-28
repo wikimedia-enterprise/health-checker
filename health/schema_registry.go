@@ -24,7 +24,7 @@ func (c *SchemaRegistryChecker) Check(ctx context.Context) error {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/subjects", c.URL), nil)
 	if err != nil {
-		return fmt.Errorf("error creating schema request: %w", err)
+		return fmt.Errorf("error creating schema request: %w, url: %s", err, c.URL)
 	}
 
 	resp, err := client.Do(req)
