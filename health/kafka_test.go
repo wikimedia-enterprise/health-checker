@@ -3,7 +3,7 @@ package health
 import (
 	"context"
 	"errors"
-	"log"
+	"fmt"
 	"testing"
 	"time"
 
@@ -43,6 +43,11 @@ func (m *MockConsumer) Committed(partitions []kafka.TopicPartition, timeoutMs in
 	return args.Get(0).([]kafka.TopicPartition), args.Error(1)
 }
 
+func (m *MockConsumer) QueryWatermarkOffsets(topic string, partition int32, timeoutMs int) (low, high int64, err error) {
+	args := m.Called(topic)
+	return 0, 0, args.Error(0)
+}
+
 // KafkaCheckerTestSuite tests Kafka health checker
 type KafkaCheckerTestSuite struct {
 	suite.Suite
@@ -68,9 +73,7 @@ func (s *KafkaCheckerTestSuite) SetupTest() {
 
 	var err error
 	s.checker, err = NewSyncKafkaChecker(s.cfg, NewConsumerOffsetStore())
-	if err != nil {
-		log.Fatal(err)
-	}
+	s.NoError(err)
 }
 
 func (s *KafkaCheckerTestSuite) TestKafkaChecker_SettingsValidation() {
@@ -268,6 +271,72 @@ func stringPtr(s string) *string {
 
 func TestKafkaCheckerTestSuite(t *testing.T) {
 	suite.Run(t, new(KafkaCheckerTestSuite))
+}
+
+type AccessCheckTestSuite struct {
+	suite.Suite
+	mockConsumer *MockConsumer
+	checker      *KafkaChecker
+
+	topics            []string
+	queryWmOffsetsErr error
+	expectedErr       error
+}
+
+func (s *AccessCheckTestSuite) SetupTest() {
+	s.mockConsumer = new(MockConsumer)
+
+	cfg := SyncKafkaChecker{
+		Name:                    "test-kafka",
+		Interval:                60 * time.Second,
+		Producer:                nil,
+		Consumer:                s.mockConsumer,
+		ConsumerTopics:          s.topics,
+		ConsumerIgnoreOffsets:   true,
+		ConsumerCheckReadAccess: true,
+	}
+
+	var err error
+	s.checker, err = NewSyncKafkaChecker(cfg, NewConsumerOffsetStore())
+	s.NoError(err)
+
+	assignments := []kafka.TopicPartition{}
+	for _, tpc := range s.topics {
+		assignments = append(assignments, kafka.TopicPartition{Topic: &tpc, Partition: 0})
+	}
+	s.mockConsumer.On("Assignment").Return(assignments, nil)
+}
+
+func (s *AccessCheckTestSuite) TearDownTest() {
+	s.mockConsumer.AssertExpectations(s.T())
+}
+
+func (s *AccessCheckTestSuite) TestKafkaConsumerAccessCheck() {
+	for _, tpc := range s.topics {
+		s.mockConsumer.On("QueryWatermarkOffsets", tpc).Return(s.queryWmOffsetsErr)
+	}
+
+	err := s.checker.Check(context.Background())
+	if s.expectedErr == nil {
+		s.NoError(err)
+	} else {
+		s.Error(err, s.expectedErr)
+	}
+}
+
+func TestKafkaConsumerAccessCheck(t *testing.T) {
+	for _, testcase := range []*AccessCheckTestSuite{
+		{
+			topics: []string{"topic"},
+		},
+		{
+			topics:            []string{"topic"},
+			queryWmOffsetsErr: fmt.Errorf("error from Kafka"),
+			expectedErr:       fmt.Errorf("consumer check failed: error from Kafka"),
+		},
+	} {
+		suite.Run(t, testcase)
+	}
 }
 
 // AsyncKafkaCheckerTestSuite tests async Kafka health checker
