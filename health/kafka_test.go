@@ -320,7 +320,7 @@ func (s *AccessCheckTestSuite) TestKafkaConsumerAccessCheck() {
 	if s.expectedErr == nil {
 		s.NoError(err)
 	} else {
-		s.Error(err, s.expectedErr)
+		s.EqualError(err, s.expectedErr.Error())
 	}
 }
 
