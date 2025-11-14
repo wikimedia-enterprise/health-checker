@@ -14,6 +14,7 @@ type ConsumerClient interface {
 	Assignment() ([]kafka.TopicPartition, error)
 	Position(partitions []kafka.TopicPartition) (offsets []kafka.TopicPartition, err error)
 	Committed(partitions []kafka.TopicPartition, timeoutMs int) (offsets []kafka.TopicPartition, err error)
+	QueryWatermarkOffsets(topic string, partition int32, timeoutMs int) (low, high int64, err error)
 }
 
 type ProducerClient interface {
@@ -25,12 +26,13 @@ type SyncKafkaChecker struct {
 	Name     string        // Name of this health check.
 	Interval time.Duration // Interval for the health check, only for repeated checks.
 
-	Producer              ProducerClient
-	Consumer              ConsumerClient
-	ProducerTopics        []string
-	ConsumerTopics        []string
-	ConsumerIgnoreOffsets bool // if true, checker won't check consumer lag, just assignment presence.
-	MaxLag                int64
+	Producer                ProducerClient
+	Consumer                ConsumerClient
+	ProducerTopics          []string
+	ConsumerTopics          []string
+	ConsumerIgnoreOffsets   bool // if true, checker won't check consumer lag, just assignment presence.
+	ConsumerCheckReadAccess bool // if true, checker will test connectivity and read access to topics
+	MaxLag                  int64
 }
 
 // KafkaChecker holds the configuration for a KafkaChecker with a stop channel.
@@ -105,7 +107,7 @@ func (k *KafkaChecker) Check(ctx context.Context) error {
 	}
 
 	if k.checker.Consumer != nil {
-		if err := checkConsumer(k.checker.Consumer, k.offsetStore, k.checker.ConsumerTopics, !k.checker.ConsumerIgnoreOffsets); err != nil {
+		if err := checkConsumer(k.checker.Consumer, k.offsetStore, k.checker.ConsumerTopics, !k.checker.ConsumerIgnoreOffsets, k.checker.ConsumerCheckReadAccess); err != nil {
 			return fmt.Errorf("consumer check failed: %w", err)
 		}
 	}
@@ -157,7 +159,8 @@ func checkProducer(producer ProducerClient, requiredTopics []string) error {
 }
 
 // checkConsumer checks topic assignments and optionally the current and committed offsets for all partitions assigned to a consumer in the specified topics.
-func checkConsumer(consumer ConsumerClient, store *ConsumerOffsetStore, topics []string, checkOffsets bool) error {
+// If checkReadAccess is true, watermark offsets will be queried for each topic (partition zero) to verify connectivity to Kafka, credentials and read ACLs.
+func checkConsumer(consumer ConsumerClient, store *ConsumerOffsetStore, topics []string, checkOffsets bool, checkReadAccess bool) error {
 	assignments, err := consumer.Assignment()
 	if err != nil {
 		return err
@@ -180,15 +183,27 @@ func checkConsumer(consumer ConsumerClient, store *ConsumerOffsetStore, topics [
 		if !exists {
 			return fmt.Errorf("no assignments for topic %s", topic)
 		}
-		if !checkOffsets {
-			continue
+		if checkOffsets {
+			if err := checkPartition(consumer, store, assignment); err != nil {
+				return err
+			}
 		}
-		if err := checkPartition(consumer, store, assignment); err != nil {
-			return err
+		if checkReadAccess {
+			if err := checkWatermarkForAccess(consumer, topic); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
+}
+
+// checkWatermarkForAccess queries watermark offsets for the provided topic (partition zero) to verify connectivity to Kafka, credentials and read ACLs.
+func checkWatermarkForAccess(consumer ConsumerClient, topic string) error {
+	timeoutMs := 1000
+	// Important: GetWatermarkOffsets is not used here because it may return cached data. We might be OK with that, as this is only relevant for startup/readiness probes.
+	_, _, err := consumer.QueryWatermarkOffsets(topic, 0, timeoutMs)
+	return err
 }
 
 // checkPartition checks the current and committed offsets for a partition.

@@ -32,7 +32,7 @@ func (c *SchemaRegistryChecker) Check(ctx context.Context) error {
 		return fmt.Errorf("error /subjects not reachable: %w", err)
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	_, _ = io.Copy(io.Discard, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("error unable to query /subjects: status %d", resp.StatusCode)
