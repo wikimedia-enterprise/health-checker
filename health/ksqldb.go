@@ -74,7 +74,7 @@ func (kac *KSQLDBAsyncChecker) ksqldbCheck(ctx context.Context) error {
 		"ksql.query.pull.table.scan.enabled": "true",
 	}
 
-	qrq := map[string]interface{}{
+	qrq := map[string]any{
 		"sql":               query,
 		"streamsProperties": properties,
 	}
@@ -95,7 +95,7 @@ func (kac *KSQLDBAsyncChecker) ksqldbCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("make KSQLDB request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
