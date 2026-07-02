@@ -27,7 +27,7 @@ type CognitoChecker struct {
 func (c *CognitoChecker) Check(ctx context.Context) error {
 	h := hmac.New(sha256.New, []byte(c.CognitoSecret))
 
-	if _, err := h.Write([]byte(fmt.Sprintf("%s%s", c.TestUserName, c.CognitoClientId))); err != nil {
+	if _, err := h.Write(fmt.Appendf(nil, "%s%s", c.TestUserName, c.CognitoClientId)); err != nil {
 		return fmt.Errorf("error writing to hmac hash %w", err)
 	}
 

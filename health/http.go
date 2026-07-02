@@ -41,7 +41,7 @@ func (c *HTTPChecker) Check(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("making request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if !slices.Contains(c.config.ExpectedStatuses, resp.StatusCode) {
 		return fmt.Errorf("unexpected status code: got %d, want %v", resp.StatusCode, c.config.ExpectedStatuses)

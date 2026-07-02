@@ -3,7 +3,7 @@ package health
 import (
 	"sync"
 
-	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
 // Store previous offsets for each partition
